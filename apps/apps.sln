@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual C++ Express 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Hammer", "Hammer\Hammer.vcxproj", "{D059F425-CDF7-46E6-9AED-157C0F6D1656}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ThorBase", "..\thor\projects\ThorBase\ThorBase.vcxproj", "{8726382A-F9C5-46E4-BFFD-91488F974C5D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D059F425-CDF7-46E6-9AED-157C0F6D1656}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D059F425-CDF7-46E6-9AED-157C0F6D1656}.Debug|Win32.Build.0 = Debug|Win32
+		{D059F425-CDF7-46E6-9AED-157C0F6D1656}.Release|Win32.ActiveCfg = Release|Win32
+		{D059F425-CDF7-46E6-9AED-157C0F6D1656}.Release|Win32.Build.0 = Release|Win32
+		{8726382A-F9C5-46E4-BFFD-91488F974C5D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{8726382A-F9C5-46E4-BFFD-91488F974C5D}.Debug|Win32.Build.0 = Debug|Win32
+		{8726382A-F9C5-46E4-BFFD-91488F974C5D}.Release|Win32.ActiveCfg = Release|Win32
+		{8726382A-F9C5-46E4-BFFD-91488F974C5D}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
