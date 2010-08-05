@@ -3,10 +3,14 @@
 #include <iostream>
 #include <fstream>
 
+#include <math/Vector.h>
+
+using namespace Thor;
+
 
 struct D3DVERTEX
 {
-   float x, y, z, rhw;
+   Vec4 vec;
    DWORD color;
 };
 
@@ -23,20 +27,20 @@ namespace bb
 #define LENGTH_OF(a) ( sizeof( a ) / sizeof( a[0] ) )
 
 D3DVERTEX gVerticesTriangle[] = {
-	{0.0f, 0.0f, 0.0f, 1.0f, 0xff00ff00},
-	{1.0f, 0.0f, 0.0f, 1.0f, 0xff0000ff},
-	{1.0f, 1.0f, 0.0f, 1.0f, 0xffff0000}
+	{Vec4(0.0f, 0.0f, 0.0f, 1.0f), 0xff00ff00},
+	{Vec4(1.0f, 0.0f, 0.0f, 1.0f), 0xff0000ff},
+	{Vec4(1.0f, 1.0f, 0.0f, 1.0f), 0xffff0000}
 };
 
 D3DVERTEX gVerticesCube[] = {
-	{-0.5f, -0.5f, -0.5f, 1.0f,	0xffffffff},
-	{ 0.5f, -0.5f, -0.5f, 1.0f,	0xffffffff},
-	{-0.5f,  0.5f, -0.5f, 1.0f,	0xffffffff},
-	{ 0.5f,  0.5f, -0.5f, 1.0f,	0xffffffff},
-	{-0.5f, -0.5f,  0.5f, 1.0f,	0xffffffff},
-	{ 0.5f, -0.5f,  0.5f, 1.0f,	0xffffffff},
-	{-0.5f,  0.5f,  0.5f, 1.0f,	0xffffffff},
-	{ 0.5f,  0.5f,  0.5f, 1.0f,	0xffffffff}
+	{Vec4(-0.5f, -0.5f, -0.5f, 1.0f),	0xffffffff},
+	{Vec4( 0.5f, -0.5f, -0.5f, 1.0f),	0xffffffff},
+	{Vec4(-0.5f,  0.5f, -0.5f, 1.0f),	0xffffffff},
+	{Vec4( 0.5f,  0.5f, -0.5f, 1.0f),	0xffffffff},
+	{Vec4(-0.5f, -0.5f,  0.5f, 1.0f),	0xffffffff},
+	{Vec4( 0.5f, -0.5f,  0.5f, 1.0f),	0xffffffff},
+	{Vec4(-0.5f,  0.5f,  0.5f, 1.0f),	0xffffffff},
+	{Vec4( 0.5f,  0.5f,  0.5f, 1.0f),	0xffffffff}
 };
 
 

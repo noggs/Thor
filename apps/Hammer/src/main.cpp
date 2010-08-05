@@ -310,6 +310,3 @@ void cleanD3D(void)
     d3d->Release();    // close and release Direct3D
 }
 
-
-
-
