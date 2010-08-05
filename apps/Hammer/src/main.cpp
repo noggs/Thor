@@ -200,13 +200,18 @@ void initD3D(HWND hWnd)
 				"vs_2_0",        //shader profile
 				0,               //flags
 				&code,           //compiled operations
-				&errors,            //errors
+				&errors,         //errors
 				&constantTable); //constants
 
 	if(SUCCEEDED(result))
 	{
 		d3ddev->CreateVertexShader((DWORD*)code->GetBufferPointer(), &vertexShader);
 		code->Release();
+	}
+	else
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
 	}
 
 	//set up Pixel Shader (NEW)
@@ -218,13 +223,18 @@ void initD3D(HWND hWnd)
 				"ps_2_0",      //shader profile     
 				0,             //flags              
 				&code,         //compiled operations
-				&errors,          //errors
+				&errors,       //errors
 				NULL);         //constants
 
 	if(SUCCEEDED(result))
 	{
 		d3ddev->CreatePixelShader((DWORD*)code->GetBufferPointer(), &pixelShader);
 		code->Release();
+	}
+	else
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
 	}
 
 
