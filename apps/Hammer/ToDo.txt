@@ -1,0 +1,13 @@
+
+
+
+1. Create Z-GBuffer to contain 16bit depth + 16bit normal (xy)
+2. Render scene into Z-GBuffer using custom pixel shader
+
+3. Create Light buffer containing 32 bits of something
+4. For each light render the info into the buffer
+
+5. Switch to forward render and look-up into light buffer for lighting information
+
+
+

@@ -109,7 +109,8 @@ LPDIRECT3DVERTEXSHADER9      vertexShader = NULL; //VS (NEW)
 LPD3DXCONSTANTTABLE          constantTable = NULL; //ConstantTable (NEW)
 LPDIRECT3DPIXELSHADER9       pixelShader = NULL; //PS (NEW)
 
-
+LPDIRECT3DTEXTURE9 pGBufferTexture = NULL;
+LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pBackBuffer = NULL;
 
 struct Camera
 {
@@ -236,6 +237,18 @@ void initD3D(HWND hWnd)
 		char* szErrors = (char*)errors->GetBufferPointer();
 		errors->Release();
 	}
+
+
+	result = d3ddev->CreateTexture( 
+				512, 512, 1,
+				D3DUSAGE_RENDERTARGET,
+				D3DFMT_A8R8G8B8,
+				D3DPOOL_DEFAULT,
+				&pGBufferTexture,
+				NULL);
+
+	result = pGBufferTexture->GetSurfaceLevel(0, &pGBufferSurface);
+
 
 
 
