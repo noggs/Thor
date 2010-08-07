@@ -121,7 +121,7 @@ void Model::LoadModel(const char* filename)
 		// create vertex buffer
 		VertexBuffer* pVertexBuffer;
 		ret = d3ddev->CreateVertexBuffer(
-			numVerts * vertSize, 0, dxFormat, 
+			numVerts * vertSize, D3DUSAGE_WRITEONLY, dxFormat, 
 			D3DPOOL_DEFAULT, &pVertexBuffer, NULL);
 
 		void* buffer;
@@ -207,6 +207,7 @@ void Model::Update()
 
 	// set local transform
 	D3DXMatrixRotationY( &gLocalMatrices[mWorldTransformID], gAngle );
+
 }
 
 

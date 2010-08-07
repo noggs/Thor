@@ -170,6 +170,18 @@
 				>
 			</File>
 		</Filter>
+		<Filter
+			Name="gui"
+			>
+			<File
+				RelativePath="..\..\gui\Gui.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\gui\Gui.h"
+				>
+			</File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>

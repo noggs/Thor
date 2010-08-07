@@ -14,7 +14,8 @@ struct VS_OUTPUT
 {
     float4 Position   : POSITION;
     float2 Texture    : TEXCOORD0;
-    float4 Normal     : TEXCOORD1;
+    float3 Normal     : TEXCOORD1;
+    float  Depth      : TEXCOORD2;
 };
 
 
@@ -32,8 +33,12 @@ VS_OUTPUT vs_main( in VS_INPUT In )
 
     Out.Position = mul(In.Position,
                        WorldViewProj);  //apply vertex transformation
+
     Out.Texture  = In.Texture;          //copy original texcoords
-    Out.Normal   = float4(In.Normal, 1.0f);
+
+    Out.Normal = -normalize(mul(In.Normal, WorldViewProj)); // transform Normal and normalize
+
+	Out.Depth = 1-(Out.Position.z/Out.Position.w); 
 
     return Out;                         //return output vertex
 }

@@ -6,6 +6,7 @@
 #include <renderer/model.h>
 #include <math/Vector.h>
 #include <math/Matrix.h>
+#include <gui/Gui.h>
 
 static const float PI = 3.1415f;
 
@@ -51,7 +52,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
                           L"WindowClass",
                           L"Our First Direct3D Program",
                           WS_OVERLAPPEDWINDOW,
-                          300, 300,
+                          80, 0,
                           640, 480,
                           NULL,
                           NULL,
@@ -108,9 +109,13 @@ LPDIRECT3DVERTEXDECLARATION9 vertexDecl = NULL; //VertexDeclaration (NEW)
 LPDIRECT3DVERTEXSHADER9      vertexShader = NULL; //VS (NEW)
 LPD3DXCONSTANTTABLE          constantTable = NULL; //ConstantTable (NEW)
 LPDIRECT3DPIXELSHADER9       pixelShader = NULL; //PS (NEW)
+LPDIRECT3DPIXELSHADER9       GBufferShader = NULL; //PS (NEW)
+
 
 LPDIRECT3DTEXTURE9 pGBufferTexture = NULL;
 LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pBackBuffer = NULL;
+
+Thor::Gui* gui = NULL;
 
 struct Camera
 {
@@ -135,12 +140,17 @@ void initD3D(HWND hWnd)
 	HRESULT result;
     d3d = Direct3DCreate9(D3D_SDK_VERSION);    // create the Direct3D interface
 
+	D3DCAPS9 caps;
+	result = d3d->GetDeviceCaps(0, D3DDEVTYPE_HAL, &caps);
+
     D3DPRESENT_PARAMETERS d3dpp;    // create a struct to hold various device information
 
     ZeroMemory(&d3dpp, sizeof(d3dpp));    // clear out the struct for use
     d3dpp.Windowed = TRUE;    // program windowed, not fullscreen
     d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;    // discard old frames
     d3dpp.hDeviceWindow = hWnd;    // set the window to be used by Direct3D
+	d3dpp.EnableAutoDepthStencil = TRUE;
+	d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
 
     // create a device class using this information and information from the d3dpp stuct
     d3d->CreateDevice(D3DADAPTER_DEFAULT,
@@ -151,10 +161,13 @@ void initD3D(HWND hWnd)
                       &d3ddev);
 
 	d3ddev->SetRenderState(D3DRS_AMBIENT,RGB(0,0,0));
-	d3ddev->SetRenderState(D3DRS_LIGHTING, true);
-	d3ddev->SetRenderState(D3DRS_CULLMODE,D3DCULL_CW);
+	d3ddev->SetRenderState(D3DRS_LIGHTING, false);
+	d3ddev->SetRenderState(D3DRS_CULLMODE,D3DCULL_CCW);
 	d3ddev->SetRenderState(D3DRS_ZENABLE,D3DZB_TRUE);
+	d3ddev->SetRenderState(D3DRS_ZWRITEENABLE,D3DZB_TRUE);
+	d3ddev->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
 
+	gui = new Thor::Gui(d3ddev);
 
 	// create a light
 	D3DLIGHT9 Light;
@@ -169,14 +182,8 @@ void initD3D(HWND hWnd)
 	Light.Range = 1000.0f;
 
 	d3ddev->SetLight(0,&Light);  //set the light (NEW)
-	d3ddev->LightEnable(0,true); //enables the light (NEW)
+	//d3ddev->LightEnable(0,true); //enables the light (NEW)
 
-	gCamera.mPosition = Thor::Vec4(0.0f, 0.0f, 1000.0f );
-	gCamera.mRotation = 0.0f;
-
-	gModel = new Thor::Model();
-	//gModel->CreateTriangle();
-	gModel->LoadModel( "duck.bbg" );
 
 	D3DVERTEXELEMENT9 decl[] = {
 		{0,0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,0},
@@ -239,8 +246,34 @@ void initD3D(HWND hWnd)
 	}
 
 
+	
+
+	//set up Pixel Shader (NEW)
+	result = D3DXCompileShaderFromFile(
+				L"gbuffer.psh",  //filepath
+				NULL,          //macro's            
+				NULL,          //includes           
+				"ps_main",     //main function      
+				"ps_2_0",      //shader profile     
+				0,             //flags              
+				&code,         //compiled operations
+				&errors,       //errors
+				NULL);         //constants
+
+	if(SUCCEEDED(result))
+	{
+		d3ddev->CreatePixelShader((DWORD*)code->GetBufferPointer(), &GBufferShader);
+		code->Release();
+	}
+	else
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
+	}
+
+
 	result = d3ddev->CreateTexture( 
-				512, 512, 1,
+				256, 256, 1,
 				D3DUSAGE_RENDERTARGET,
 				D3DFMT_A8R8G8B8,
 				D3DPOOL_DEFAULT,
@@ -250,7 +283,15 @@ void initD3D(HWND hWnd)
 	result = pGBufferTexture->GetSurfaceLevel(0, &pGBufferSurface);
 
 
+	
 
+	gModel = new Thor::Model();
+	//gModel->CreateTriangle();
+	gModel->LoadModel( "duck.bbg" );
+
+
+	gCamera.mPosition = Thor::Vec4(0.0f, 100.0f, 300.0f );
+	gCamera.mRotation = 0.0f;
 
 }
 
@@ -258,21 +299,18 @@ void initD3D(HWND hWnd)
 void SetupCamera(void)
 {
 	D3DXMATRIXA16 ProjectionMatrix;
-	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, 1.0f, 100.0f, 2000.0f);
+	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, 1.0f, 100.0f, 500.0f);
 	d3ddev->SetTransform(D3DTS_PROJECTION, &ProjectionMatrix);
 
-	
 	Thor::Matrix ViewMatrix;
   
-   // set the view matrix
-	D3DXVECTOR3 EyePoint(gCamera.mPosition.GetX(),
-                        gCamera.mPosition.GetY(),
-                        gCamera.mPosition.GetZ());
-   D3DXVECTOR3 LookAt(0.0f, 0.0f, 0.0f);
-   D3DXVECTOR3 UpVector(0.0f, 1.0f, 0.0f);
-   D3DXMatrixLookAtLH(&ViewMatrix, &EyePoint, &LookAt, &UpVector);
-  
-   d3ddev->SetTransform(D3DTS_VIEW, &ViewMatrix);
+	// set the view matrix
+	D3DXVECTOR3 EyePoint(gCamera.mPosition.GetX(),gCamera.mPosition.GetY(),gCamera.mPosition.GetZ());
+	D3DXVECTOR3 LookAt(0.0f, 70.0f, 0.0f);
+	D3DXVECTOR3 UpVector(0.0f, 1.0f, 0.0f);
+	D3DXMatrixLookAtLH(&ViewMatrix, &EyePoint, &LookAt, &UpVector);
+
+	d3ddev->SetTransform(D3DTS_VIEW, &ViewMatrix);
 }
 
 
@@ -287,19 +325,56 @@ void TransformAllMatrices(const int start, const int end, const Thor::Matrix& m)
 }
 
 
+//Load texture from file with D3DX
+//Supported formats: BMP, PPM, DDS, JPG, PNG, TGA, DIB
+IDirect3DTexture9 *LoadTexture(char *fileName)
+{
+  IDirect3DTexture9 *d3dTexture;
+  D3DXIMAGE_INFO SrcInfo;      //Optional
+
+  //Use a magenta colourkey
+  D3DCOLOR colorkey = 0xFFFF00FF;
+
+  // Load image from file
+  if (FAILED(D3DXCreateTextureFromFileExA (d3ddev, fileName, 0, 0, 1, 0, 
+        D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, D3DX_FILTER_NONE, D3DX_DEFAULT, 
+        colorkey, &SrcInfo, NULL, &d3dTexture)))
+  {
+    return NULL;
+  }
+
+  //Return the newly made texture
+  return d3dTexture;
+}
+
+IDirect3DTexture9* guiTexture = NULL;
+
+
 // this is the function used to render a single frame
 void render_frame(void)
 {
+	if(guiTexture==NULL)
+	{
+		guiTexture = LoadTexture("test.png");
+	}
+
+
 	Thor::Matrix identity;
 	//Thor::MtxIdentity( identity );
 	D3DXMatrixIdentity( &identity );
 	TransformAllMatrices(0, gNumWorldMatrices, identity);
 
-	// clear the window to a deep blue
-	d3ddev->Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 40, 100), 1.0f, 0);
+	// grab the back buffer
+	d3ddev->GetRenderTarget(0, &pBackBuffer);
+
+	// set G buffer rt
+	d3ddev->SetRenderTarget(0, pGBufferSurface);
+	// clear the rt to red
+	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
+					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
 
 	d3ddev->BeginScene();    // begins the 3D scene
-
+#if 1
 		SetupCamera();
 
 		//communicate with shader (NEW)
@@ -314,15 +389,33 @@ void render_frame(void)
 		// setup vertex shader and pixel shader
 		d3ddev->SetVertexDeclaration(vertexDecl);
         d3ddev->SetVertexShader(vertexShader);
-        d3ddev->SetPixelShader(pixelShader);
+        d3ddev->SetPixelShader(GBufferShader);
 
 		// do 3D rendering on the back buffer here
 		gModel->Update();
 		gModel->Render();
 
+#endif
+
 	d3ddev->EndScene();    // ends the 3D scene
 
+
+	// restore the back buffer
+	d3ddev->SetRenderTarget(0, pBackBuffer);
+
+	// clear the window to a deep blue
+	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
+					D3DCOLOR_XRGB(0, 40, 100), 1.0f, 0);
+	d3ddev->BeginScene();    // begins the 3D scene
+
+		//gui->DrawTexturedRect(0, 0, 128, 128, guiTexture );
+		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+		// render 2D overlay
+		gui->Render(d3ddev);
+
+	d3ddev->EndScene();
 	d3ddev->Present(NULL, NULL, NULL, NULL);    // displays the created frame
+
 }
 
 
@@ -332,4 +425,7 @@ void cleanD3D(void)
     d3ddev->Release();    // close and release the 3D device
     d3d->Release();    // close and release Direct3D
 }
+
+
+
 
