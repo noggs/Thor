@@ -11,3 +11,35 @@
 
 
 
+Components
+
+	RigidBody component
+		
+		Debug info (ptr to name etc)
+		Pointer to a rigidbody
+		Index into SoA data in manager
+			- Local transform matrix
+			- Previous local transform matrix
+		
+	Renderable component
+	
+		Debug info (ptr to name etc)
+		Model pointer
+		Index into SoA data in manager
+			- Material information (packed)
+			- Local transform matrix
+		
+		
+		
+Factories		
+
+	RigidBody factory - contains 'hot' data
+		Array of local matrices
+		Array of previous local matrices
+		List of active components
+
+	Renderable factory - contains 'hot' data
+		Array of material information
+		Array of local transform matrices
+		Array of World transform matrices
+

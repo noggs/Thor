@@ -185,7 +185,7 @@ void initD3D(HWND hWnd)
 		D3DDECL_END()};
 	result = d3ddev->CreateVertexDeclaration(decl, &vertexDecl);
 
-	LPD3DXBUFFER code = NULL; //Temporary buffer (NEW)
+	LPD3DXBUFFER code = NULL; //Temporary buffers
 	LPD3DXBUFFER errors = NULL;
 
 	LPCSTR vshProf = D3DXGetVertexShaderProfile( d3ddev );
