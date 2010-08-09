@@ -3,7 +3,7 @@
 
 #include <d3d9.h>
 #include <d3dx9math.h>
-
+#include <string>
 #include <math/Matrix.h>
 
 namespace Thor {
@@ -38,9 +38,10 @@ namespace Thor {
 		void SetLocalMatrix(const Matrix& );
 
 	private:
-		int			mWorldTransformID;		// index into World matrix array
-		int			mLocalTransformID;		// index into Local matrix array
-		Geometry*	mGeometry;					// pointer to geometry instance
+		std::string		mName;	// always handy for debug
+		int				mWorldTransformID;		// index into World matrix array
+		int				mLocalTransformID;		// index into Local matrix array
+		Geometry*		mGeometry;					// pointer to geometry instance
 	};
 
 }

@@ -26,6 +26,44 @@ void cleanD3D(void);    // closes Direct3D and releases memory
 // the WindowProc function prototype
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
+// Some global variables used to measure the time
+float  timeAtGameStart;
+UINT64 ticksPerSecond;
+
+float GetGameTime()
+{
+  UINT64 ticks;
+  float time;
+  // This is the number of clock ticks since start
+  QueryPerformanceCounter((LARGE_INTEGER *)&ticks);
+
+  // Divide by frequency to get the time in seconds
+  time = (float)(__int64)ticks/(float)(__int64)ticksPerSecond;
+  // Subtract the time at game start to get
+  // the time since the game started
+  time -= timeAtGameStart;
+  return time;
+}
+
+// Global variables for measuring fps
+float lastUpdate        = 0;
+float fpsUpdateInterval = 0.5f;
+UINT  numFrames         = 0;
+float fps               = 0;
+
+// Called once for every frame
+void UpdateFPS()
+{
+  numFrames++;
+  float currentUpdate = GetGameTime();
+  if( currentUpdate - lastUpdate > fpsUpdateInterval )
+  {
+    fps = numFrames / (currentUpdate - lastUpdate);
+    lastUpdate = currentUpdate;
+    numFrames = 0;
+  }
+}
+
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance,
@@ -66,6 +104,15 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     // enter the main loop:
 
+
+	if( !QueryPerformanceFrequency((LARGE_INTEGER *)&ticksPerSecond) )
+		ticksPerSecond = 1000;
+	// If timeAtGameStart is 0 then we get the time since
+	// the start of the computer when we call GetGameTime()
+	timeAtGameStart = 0;
+	timeAtGameStart = GetGameTime();
+
+
     MSG msg;
 
     while(TRUE)
@@ -80,6 +127,8 @@ int WINAPI WinMain(HINSTANCE hInstance,
             break;
 
         render_frame();
+
+		UpdateFPS();
     }
 
     // clean up DirectX and COM
@@ -111,6 +160,7 @@ LPD3DXCONSTANTTABLE          constantTable = NULL; //ConstantTable (NEW)
 LPDIRECT3DPIXELSHADER9       pixelShader = NULL; //PS (NEW)
 LPDIRECT3DPIXELSHADER9       GBufferShader = NULL; //PS (NEW)
 
+ID3DXEffect*				pEffect_GBuffer = NULL;
 
 LPDIRECT3DTEXTURE9 pGBufferTexture = NULL;
 LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pBackBuffer = NULL;
@@ -293,6 +343,17 @@ void initD3D(HWND hWnd)
 	gCamera.mPosition = Thor::Vec4(0.0f, 100.0f, 300.0f );
 	gCamera.mRotation = 0.0f;
 
+
+	result = D3DXCreateEffectFromFile( d3ddev, L"gbuffer.fx", NULL, NULL, 
+										0, NULL, &pEffect_GBuffer, &errors );
+
+	if(FAILED(result))
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
+	}
+
+
 }
 
 
@@ -358,11 +419,29 @@ void render_frame(void)
 		guiTexture = LoadTexture("test.png");
 	}
 
+	// update scene
+	gModel->Update();
+
+
 
 	Thor::Matrix identity;
 	//Thor::MtxIdentity( identity );
 	D3DXMatrixIdentity( &identity );
 	TransformAllMatrices(0, gNumWorldMatrices, identity);
+
+	// set view parameters (World, View and Proj matrices)
+	SetupCamera();
+
+	// calculate WorldViewProj matrix
+    D3DXMATRIXA16 matWorld, matView, matProj;
+    d3ddev->GetTransform(D3DTS_WORLD, &matWorld);
+    d3ddev->GetTransform(D3DTS_VIEW, &matView);
+    d3ddev->GetTransform(D3DTS_PROJECTION, &matProj);
+
+    D3DXMATRIXA16 matWorldViewProj = matWorld * matView * matProj;
+
+	////////////////////
+	// Step 1 - render the scene into GBuffer storing normals and depth
 
 	// grab the back buffer
 	d3ddev->GetRenderTarget(0, &pBackBuffer);
@@ -373,17 +452,32 @@ void render_frame(void)
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
 					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
 
+
+	// Apply the technique contained in the effect 
+	UINT cPasses, iPass;
+	pEffect_GBuffer->Begin(&cPasses, 0);
+
+	for (iPass = 0; iPass < cPasses; iPass++)
+	{
+		pEffect_GBuffer->BeginPass(iPass);
+
+		pEffect_GBuffer->SetMatrix( "WorldViewProj", &matWorldViewProj);
+
+		// Only call CommitChanges if any state changes have happened
+		// after BeginPass is called
+		pEffect_GBuffer->CommitChanges();
+
+		// Render the mesh with the applied technique
+		gModel->Render();
+
+		pEffect_GBuffer->EndPass();
+	}
+	pEffect_GBuffer->End();
+
+
+#if 0
 	d3ddev->BeginScene();    // begins the 3D scene
-#if 1
-		SetupCamera();
 
-		//communicate with shader (NEW)
-        D3DXMATRIXA16 matWorld, matView, matProj;
-        d3ddev->GetTransform(D3DTS_WORLD, &matWorld);
-        d3ddev->GetTransform(D3DTS_VIEW, &matView);
-        d3ddev->GetTransform(D3DTS_PROJECTION, &matProj);
-
-        D3DXMATRIXA16 matWorldViewProj = matWorld * matView * matProj;
         constantTable->SetMatrix(d3ddev, "WorldViewProj", &matWorldViewProj);
 
 		// setup vertex shader and pixel shader
@@ -392,13 +486,18 @@ void render_frame(void)
         d3ddev->SetPixelShader(GBufferShader);
 
 		// do 3D rendering on the back buffer here
-		gModel->Update();
 		gModel->Render();
 
+	d3ddev->EndScene();    // ends the 3D scene
 #endif
 
-	d3ddev->EndScene();    // ends the 3D scene
 
+	/////////////////////
+	// Step 2 - render the lighting into the light buffer sampling the GBuffer
+
+
+	/////////////////////
+	// Step 3 - render the scene into back buffer sampling from lighting/G buffer
 
 	// restore the back buffer
 	d3ddev->SetRenderTarget(0, pBackBuffer);

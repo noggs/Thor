@@ -157,6 +157,10 @@
 				RelativePath="..\..\renderer\Model.h"
 				>
 			</File>
+			<File
+				RelativePath="..\..\renderer\Renderer.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="math"

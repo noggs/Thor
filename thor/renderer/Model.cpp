@@ -58,6 +58,7 @@ extern int gNumLocalMatrices;
 
 void Model::CreateTriangle()
 {
+	mName.assign("Triangle");
 	VertexBuffer* pVertexBuffer;
 	d3ddev->CreateVertexBuffer(3*sizeof(D3DVERTEX), 0, D3DFVF_XYZ|D3DFVF_DIFFUSE, 
 		D3DPOOL_DEFAULT, &pVertexBuffer, NULL);
@@ -86,6 +87,7 @@ void Model::CreateTriangle()
 void Model::LoadModel(const char* filename)
 {
 	HRESULT ret = 0;
+	mName.assign(filename);
 
 	// open file
 	std::fstream in( filename, std::ios::in | std::ios::binary);

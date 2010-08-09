@@ -1,12 +1,32 @@
 
-
-
-1. Create Z-GBuffer to contain 16bit depth + 16bit normal (xy)
-2. Render scene into Z-GBuffer using custom pixel shader (screen-space normals)
+Light pre-pass renderer
+~~~~~~~~~~~~~~~~~~~~~~~
+[DONE] 1. Create Z-GBuffer to contain 16bit depth + 16bit normal (xy)
+[DONE] 2. Render scene into Z-GBuffer using custom pixel shader (screen-space normals)
 [DONE] 2a. Render ZGBuffer onto corner of the screen
+2b. For debug decode normal and depth and draw to seperate screen areas
+
 3. Create Light buffer containing 32 bits of something
 4. For each light render the info into the buffer
 5. Switch to forward render and look-up into light buffer for lighting information
+
+
+Misc
+~~~~
+Handle textured models (names/purpose [nrm/dif/spc] in model format)
+FPS counter
+Build system for assets...!
+
+
+Code Management
+~~~~~~~~~~~~~~~
+Renderer class 
+	Handle drawing rendertargets without using GUI class (change shaders etc)
+Use FX instead of psh/vsh
+Shader library?
+Texture loader / library
+Camera class
+Scene class
 
 
 
