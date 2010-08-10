@@ -162,8 +162,8 @@ LPDIRECT3DPIXELSHADER9       GBufferShader = NULL; //PS (NEW)
 
 ID3DXEffect*				pEffect_GBuffer = NULL;
 
-LPDIRECT3DTEXTURE9 pGBufferTexture = NULL;
-LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pBackBuffer = NULL;
+LPDIRECT3DTEXTURE9 pGBufferTexture = NULL, pLightBufferTexture = NULL;
+LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pLightBufferSurface = NULL, pBackBuffer = NULL;
 
 Thor::Gui* gui = NULL;
 
@@ -176,6 +176,7 @@ Camera gCamera;
 
 
 Thor::Model* gModel = NULL;
+Thor::Model* gSphere = NULL;
 
 
 Thor::Matrix gWorldMatrices[10];
@@ -322,6 +323,9 @@ void initD3D(HWND hWnd)
 	}
 
 
+	//////
+	// Create G Buffer
+
 	result = d3ddev->CreateTexture( 
 				256, 256, 1,
 				D3DUSAGE_RENDERTARGET,
@@ -333,11 +337,26 @@ void initD3D(HWND hWnd)
 	result = pGBufferTexture->GetSurfaceLevel(0, &pGBufferSurface);
 
 
-	
+	//////
+	// Create Light buffer
+
+	result = d3ddev->CreateTexture(
+				256, 256, 1,
+				D3DUSAGE_RENDERTARGET,
+				D3DFMT_A8R8G8B8,
+				D3DPOOL_DEFAULT,
+				&pLightBufferTexture,
+				NULL);
+
+	result = pLightBufferTexture->GetSurfaceLevel(0, &pLightBufferSurface);
+
 
 	gModel = new Thor::Model();
 	//gModel->CreateTriangle();
 	gModel->LoadModel( "duck.bbg" );
+
+	gSphere = new Thor::Model();
+	gSphere->LoadModel( "sphere.bbg" );
 
 
 	gCamera.mPosition = Thor::Vec4(0.0f, 100.0f, 300.0f );

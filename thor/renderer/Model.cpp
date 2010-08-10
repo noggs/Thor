@@ -210,6 +210,11 @@ void Model::Update()
 	// set local transform
 	D3DXMatrixRotationY( &gLocalMatrices[mWorldTransformID], gAngle );
 
+	static float scale = 1.0f;
+	Thor::Matrix scaleMat;
+	D3DXMatrixScaling( &scaleMat, scale, scale, scale );
+
+	D3DXMatrixMultiply( &gLocalMatrices[ mWorldTransformID ], &gLocalMatrices[ mWorldTransformID ], &scaleMat );
 }
 
 
