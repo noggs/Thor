@@ -72,6 +72,16 @@ float F32_Decompress(float2 vec)
 	return (vec.x+vec.y*1.0/256.0);
 }
 
+float2 PackNormal(float3 nrm)
+{
+	return float2(nrm.x, nrm.y);
+}
+
+float3 UnpackNormal(float2 nrm)
+{
+	return float3( nrm.x, nrm.y, sqrt(1-(nrm.x*nrm.x)-(nrm.y*nrm.y)) );
+}
+
 
 PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
 {
@@ -84,19 +94,14 @@ PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
 	//Out.Color = float4(In.Normal.x, In.Normal.y, 0.0f, 0.0f);
 	//Out.Color = float4(F32_Compress(In.Depth), 0.0f, 1.0f );
 	
-	Out.Color = float4(In.Normal.x, In.Normal.y, F32_Compress(In.Depth));
+	Out.Color = float4( PackNormal(In.Normal.xyz), F32_Compress(In.Depth) );
 	
 	// test unpacking the depth
 	//float unpacked = F32_Decompress(Out.Color.zw);
 	//Out.Color = float4( unpacked, unpacked, unpacked, 1.0f );
 	
 	// test unpacking the normal
-	{
-		//float x = Out.Color.x;
-		//float y = Out.Color.y;
-		//float z = sqrt(1-(x*x)-(y*y));
-		//Out.Color = float4(x,y,z,1.0f);
-	}
+	Out.Color = float4( UnpackNormal(Out.Color.xy), 1.0f );
 
     return Out;                                //return output pixel
 }

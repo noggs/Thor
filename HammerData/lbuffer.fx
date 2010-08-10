@@ -2,26 +2,38 @@
 // Global variables
 float4x4 WorldViewProj;
 
+// Light parameters
+float4 LightPos;
+float4 LightColour;
+float  LightAttenuation;
+float  LightIntensity;
 
+texture GBufferTexture;
 
+sampler GBufferSampler = 
+sampler_state
+{
+	Texture = <GBufferTexture>;
+	MipFilter = LINEAR;
+	MinFilter = LINEAR;
+	MagFilter = LINEAR;
+};
 
 
 // Vertex shader input structure
 struct VS_INPUT
 {
-    float4 Position   : POSITION;
-    float2 Texture    : TEXCOORD0;
-	float3 Normal     : NORMAL;
+    float4 Position		: POSITION;
 };
+
+
 
 
 // Vertex shader output structure
 struct VS_OUTPUT
 {
-    float4 Position   : POSITION;
-    float2 Texture    : TEXCOORD0;
-    float3 Normal     : TEXCOORD1;
-    float  Depth      : TEXCOORD2;
+    float4 Position		: POSITION;
+    float2 ScreenUV		: TEXCOORD0;
 };
 
 
@@ -30,17 +42,13 @@ struct VS_OUTPUT
 // Type: Vertex shader
 // Desc: Vertex transformation and texture coord pass-through
 //
-VS_OUTPUT vs_main( in VS_INPUT In )
+VS_OUTPUT vs_light( in VS_INPUT In )
 {
     VS_OUTPUT Out;                      //create an output vertex
 
     Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
-
-    Out.Texture  = In.Texture;          //copy original texcoords
-
-    Out.Normal = -normalize(mul(In.Normal, WorldViewProj)); // transform Normal and normalize
-
-	Out.Depth = 1-(Out.Position.z/Out.Position.w); 
+    
+    Out.ScreenUV = ?????;
 
     return Out;                         //return output vertex
 }
@@ -72,45 +80,49 @@ float F32_Decompress(float2 vec)
 	return (vec.x+vec.y*1.0/256.0);
 }
 
+float2 PackNormal(float3 nrm)
+{
+	return float2(nrm.x, nrm.y);
+}
 
-PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
+float3 UnpackNormal(float2 nrm)
+{
+	return float3( nrm.x, nrm.y, sqrt(1-(nrm.x*nrm.x)-(nrm.y*nrm.y)) );
+}
+
+
+PS_OUTPUT ps_light( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
-
-	//Out.Color = float4(In.Normal, 1.0f);
-	//Out.Color = float4(In.Depth, In.Depth, In.Depth, 1.0f);
-	
-	// pack normal into the first 16 bits and depth into next two
-	//Out.Color = float4(In.Normal.x, In.Normal.y, 0.0f, 0.0f);
-	//Out.Color = float4(F32_Compress(In.Depth), 0.0f, 1.0f );
-	
-	Out.Color = float4(In.Normal.x, In.Normal.y, F32_Compress(In.Depth));
-	
-	// test unpacking the depth
-	//float unpacked = F32_Decompress(Out.Color.zw);
-	//Out.Color = float4( unpacked, unpacked, unpacked, 1.0f );
-	
-	// test unpacking the normal
-	{
-		//float x = Out.Color.x;
-		//float y = Out.Color.y;
-		//float z = sqrt(1-(x*x)-(y*y));
-		//Out.Color = float4(x,y,z,1.0f);
-	}
+    
+    // lookup this pixel in the GBuffer to get the surface normal at this point
+    // use the depth to calculate the distance from the light
+    
+    // grab value from the GBuffer (packed normal/depth)
+    float4 gvalue = tex2D( GBufferSampler, In.ScreenUV );
+    
+    // extract normal and depth value
+    float3 nrm = UnpackNormal( gvalue.xy );
+    float depth = F32_Decompress( gvalue.zw );
+    
+    // reconstruct world space position of pixel from screenUV, depth and WorldViewProj
+    float3 pixelPos = ;
+    
+    // calculate distance and direction to light
+    float3 lightDir = sub(PixelPos, LightPos);
+    float lightDist = length( lightDir );
+    lightDir = normalize( lightDir );
+    
+    // for directional light:
+    // diffuse = dot(N,L) * Di * Dc			( N=surface normal,  L=light direction,  Di=light intensity,  Dc=light colour
+    
+    // for point light
+    // diffuse = dot(N,L) * S * Att			( S=distance to light,  Att=Attenuation )
 
     return Out;                                //return output pixel
 }
 
 
-
-Technique RenderToGBuffer
-{
-	pass Pass0
-	{
-        VertexShader = compile vs_2_0 vs_main();
-        PixelShader  = compile ps_2_0 ps_packNormalDepth(); 
-	}
-}
 
 
 Technique RenderToLightBuffer
