@@ -51,7 +51,7 @@ void Gui::DrawTexturedRect(int left, int top, int width, int height, IDirect3DTe
 		mVertexBuffer->Unlock();
 
 		// record we've added these verts to the buffer
-		mCurrentOffset += 6;
+		mCurrentOffset += 6 * sizeof(GuiVertex);
 
 		// add command to the queue
 		GuiCmd& cmd = mCommands[mNumCommands++];
@@ -67,29 +67,10 @@ void Gui::Render(IDirect3DDevice9 *d3ddev)
 
 	if( mNumCommands > 0 )
 	{
-		// setup orthographic mode
-
-		//D3DXMATRIX mat;
-		//D3DXMatrixIdentity( &mat );
-		//d3ddev->SetTransform( D3DTS_VIEW, &mat );
-		//d3ddev->SetTransform( D3DTS_PROJECTION, &mat );
-		//d3ddev->SetTransform( D3DTS_WORLD, &mat );
-
-
-		//d3ddev->SetRenderState(D3DRS_LIGHTING, FALSE);
-		//d3ddev->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
-		//d3ddev->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-		//d3ddev->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-		//d3ddev->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-
 		// setup vertex stream
 		unsigned int dxFormat = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
 		res = d3ddev->SetStreamSource(0, mVertexBuffer, 0, sizeof(GuiVertex));
 		res = d3ddev->SetFVF( dxFormat );
-
-		d3ddev->SetVertexShader(NULL);
-		d3ddev->SetPixelShader(NULL);
-
 
 		int vert = 0;
 

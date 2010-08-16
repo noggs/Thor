@@ -1,8 +1,9 @@
 
 // Global variables
-float4x4 WorldViewProj;
+float4x4 WorldViewProj;		// matrix from ObjectSpace to ClipSpace
+float4x4 WorldView;			// matrix from ObjectSpace to EyeSpace
 
-
+float FarClip;
 
 
 
@@ -40,7 +41,12 @@ VS_OUTPUT vs_main( in VS_INPUT In )
 
     Out.Normal = -normalize(mul(In.Normal, WorldViewProj)); // transform Normal and normalize
 
-	Out.Depth = 1-(Out.Position.z/Out.Position.w); 
+	// non-linear depth
+	Out.Depth = (Out.Position.z/Out.Position.w); 
+	
+	// linear depth
+	//float4 eyeSpacePos = mul(In.Position, WorldView);
+	//Out.Depth = (eyeSpacePos.z / FarClip);
 
     return Out;                         //return output vertex
 }
@@ -74,12 +80,14 @@ float F32_Decompress(float2 vec)
 
 float2 PackNormal(float3 nrm)
 {
-	return float2(nrm.x, nrm.y);
+	return float2((nrm.x+1.0f)/2.0f, (nrm.y+1.0f)/2.0f);
 }
 
 float3 UnpackNormal(float2 nrm)
 {
-	return float3( nrm.x, nrm.y, sqrt(1-(nrm.x*nrm.x)-(nrm.y*nrm.y)) );
+	float x = (nrm.x*2.0f)-1.0f;
+	float y = (nrm.y*2.0f)-1.0f;
+	return float3( x, y, sqrt(1-(x*x)-(y*y)) );
 }
 
 
@@ -101,7 +109,9 @@ PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
 	//Out.Color = float4( unpacked, unpacked, unpacked, 1.0f );
 	
 	// test unpacking the normal
-	Out.Color = float4( UnpackNormal(Out.Color.xy), 1.0f );
+	//float3 un = UnpackNormal(Out.Color.xy);
+	//Out.Color = float4( un, 1.0f );
+	//Out.Color = float4( (un.x+1.0f)/2.0f, 0.0f, 0.0f, 1.0f );
 
     return Out;                                //return output pixel
 }

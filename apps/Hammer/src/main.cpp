@@ -161,6 +161,7 @@ LPDIRECT3DPIXELSHADER9       pixelShader = NULL; //PS (NEW)
 LPDIRECT3DPIXELSHADER9       GBufferShader = NULL; //PS (NEW)
 
 ID3DXEffect*				pEffect_GBuffer = NULL;
+ID3DXEffect*				pEffect_Lighting = NULL;
 
 LPDIRECT3DTEXTURE9 pGBufferTexture = NULL, pLightBufferTexture = NULL;
 LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pLightBufferSurface = NULL, pBackBuffer = NULL;
@@ -373,13 +374,25 @@ void initD3D(HWND hWnd)
 	}
 
 
+	result = D3DXCreateEffectFromFile( d3ddev, L"lbuffer.fx", NULL, NULL,
+										0, NULL, &pEffect_Lighting, &errors );
+	if( FAILED( result ) )
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
+	}
+
+
 }
 
+
+float gNearClip = 100.0f;
+float gFarClip = 900.0f;
 
 void SetupCamera(void)
 {
 	D3DXMATRIXA16 ProjectionMatrix;
-	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, 1.0f, 100.0f, 500.0f);
+	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, 1.0f, gNearClip, gFarClip);
 	d3ddev->SetTransform(D3DTS_PROJECTION, &ProjectionMatrix);
 
 	Thor::Matrix ViewMatrix;
@@ -429,6 +442,7 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 
 IDirect3DTexture9* guiTexture = NULL;
 
+Thor::Vec4 gLightDir(1.0f, 0.0f, 0.0f, 0.0f);
 
 // this is the function used to render a single frame
 void render_frame(void)
@@ -459,6 +473,9 @@ void render_frame(void)
 
     D3DXMATRIXA16 matWorldViewProj = matWorld * matView * matProj;
 
+	// calculate WorldView matrix
+	D3DXMATRIXA16 matWorldView = matWorld * matView;
+
 	////////////////////
 	// Step 1 - render the scene into GBuffer storing normals and depth
 
@@ -467,10 +484,14 @@ void render_frame(void)
 
 	// set G buffer rt
 	d3ddev->SetRenderTarget(0, pGBufferSurface);
-	// clear the rt to red
+	// clear the rt
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
 					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
 
+	// setup shader constants
+	pEffect_GBuffer->SetMatrix( "WorldViewProj", &matWorldViewProj);
+	pEffect_GBuffer->SetMatrix( "WorldView", &matWorldView);
+	pEffect_GBuffer->SetFloat( "FarClip", gFarClip );
 
 	// Apply the technique contained in the effect 
 	UINT cPasses, iPass;
@@ -480,12 +501,6 @@ void render_frame(void)
 	{
 		pEffect_GBuffer->BeginPass(iPass);
 
-		pEffect_GBuffer->SetMatrix( "WorldViewProj", &matWorldViewProj);
-
-		// Only call CommitChanges if any state changes have happened
-		// after BeginPass is called
-		pEffect_GBuffer->CommitChanges();
-
 		// Render the mesh with the applied technique
 		gModel->Render();
 
@@ -494,25 +509,47 @@ void render_frame(void)
 	pEffect_GBuffer->End();
 
 
-#if 0
-	d3ddev->BeginScene();    // begins the 3D scene
-
-        constantTable->SetMatrix(d3ddev, "WorldViewProj", &matWorldViewProj);
-
-		// setup vertex shader and pixel shader
-		d3ddev->SetVertexDeclaration(vertexDecl);
-        d3ddev->SetVertexShader(vertexShader);
-        d3ddev->SetPixelShader(GBufferShader);
-
-		// do 3D rendering on the back buffer here
-		gModel->Render();
-
-	d3ddev->EndScene();    // ends the 3D scene
-#endif
-
-
 	/////////////////////
 	// Step 2 - render the lighting into the light buffer sampling the GBuffer
+
+	// set lighting buffer rt
+	d3ddev->SetRenderTarget(0, pLightBufferSurface);
+	// clear the rt
+	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
+					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
+
+	pEffect_Lighting->SetMatrix( "WorldViewProj", &matWorldViewProj);
+	pEffect_Lighting->SetMatrix( "WorldView", &matWorldView);
+	pEffect_Lighting->SetFloat( "FarClip", gFarClip );
+
+	float gbufferSize[] = {256.0f, 256.0f };
+	pEffect_Lighting->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
+
+	
+	// transform directional light vector into view space
+	{
+		D3DXVECTOR4 lightDir( gLightDir.GetX(), gLightDir.GetY(), gLightDir.GetZ(), gLightDir.GetW() );
+		D3DXVec4Transform( &lightDir, &lightDir, &matView );
+		pEffect_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 4 );
+	}
+
+	pEffect_Lighting->SetTechnique("DirectionalLight");
+
+	// Apply the technique contained in the effect 
+	pEffect_Lighting->Begin(&cPasses, 0);
+
+	for (iPass = 0; iPass < cPasses; iPass++)
+	{
+		pEffect_Lighting->BeginPass(iPass);
+
+		// Render a full screen quad for the directional light pass
+		// use Gui system!
+		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+		gui->Render(d3ddev);
+
+		pEffect_Lighting->EndPass();
+	}
+	pEffect_Lighting->End();
 
 
 	/////////////////////
@@ -526,10 +563,12 @@ void render_frame(void)
 					D3DCOLOR_XRGB(0, 40, 100), 1.0f, 0);
 	d3ddev->BeginScene();    // begins the 3D scene
 
-		//gui->DrawTexturedRect(0, 0, 128, 128, guiTexture );
 		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+		gui->DrawTexturedRect(256, 0, 256, 256, pLightBufferTexture );
+
 		// render 2D overlay
 		gui->Render(d3ddev);
+
 
 	d3ddev->EndScene();
 	d3ddev->Present(NULL, NULL, NULL, NULL);    // displays the created frame

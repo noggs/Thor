@@ -1,22 +1,33 @@
 
 // Global variables
-float4x4 WorldViewProj;
+float4x4	WorldViewProj;		// matrix from ObjectSpace to ClipSpace
+float4x4	WorldView;			// matrix from ObjectSpace to EyeSpace
+float4x4	InvWorldViewProj;	// matrix to unproject a point from ClipSpace back to ObjectSpace
+float		FarClip;			// farclip plane distance
+float2		GBufferSize;		// dimensions of GBuffer texture
 
-// Light parameters
-float4 LightPos;
-float4 LightColour;
-float  LightAttenuation;
-float  LightIntensity;
 
+// Shared light parameters
+float3 LightColourAmb;
+float3 LightColourDif = float3(1.0f, 1.0f, 1.0f);
+
+// Point Light parameters
+float4 LightPosVS;	// need to be in view space
+float  LightRadius;
+
+// Directional Light parameters
+float4 LightDirVS;
+
+
+// G-Buffer texture lookup
 texture GBufferTexture;
-
 sampler GBufferSampler = 
 sampler_state
 {
 	Texture = <GBufferTexture>;
-	MipFilter = LINEAR;
-	MinFilter = LINEAR;
-	MagFilter = LINEAR;
+	MipFilter = NONE;
+	MinFilter = NONE;
+	MagFilter = NONE;
 };
 
 
@@ -33,7 +44,7 @@ struct VS_INPUT
 struct VS_OUTPUT
 {
     float4 Position		: POSITION;
-    float2 ScreenUV		: TEXCOORD0;
+    float4 PositionVS   : TEXCOORD0;
 };
 
 
@@ -46,9 +57,19 @@ VS_OUTPUT vs_light( in VS_INPUT In )
 {
     VS_OUTPUT Out;                      //create an output vertex
 
-    Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
+    //Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
     
-    Out.ScreenUV = ?????;
+	// Offset the position by half a pixel to correctly
+	// align texels to pixels. Only necessary for D3D9 or XNA
+	Out.Position.x = In.Position.x - (1.0f/GBufferSize.x);
+	Out.Position.y = In.Position.y + (1.0f/GBufferSize.y);
+	Out.Position.z = In.Position.z;
+	Out.Position.w = 1.0f;
+	
+	Out.PositionVS = Out.Position;
+	//Out.PositionVS.x = In.Position.x - (1.0f/GBufferSize.x);
+	//Out.PositionVS.y = In.Position.y + (1.0f/GBufferSize.y);
+	
 
     return Out;                         //return output vertex
 }
@@ -82,15 +103,45 @@ float F32_Decompress(float2 vec)
 
 float2 PackNormal(float3 nrm)
 {
-	return float2(nrm.x, nrm.y);
+	return float2((nrm.x+1.0f)/2.0f, (nrm.y+1.0f)/2.0f);
 }
 
 float3 UnpackNormal(float2 nrm)
 {
-	return float3( nrm.x, nrm.y, sqrt(1-(nrm.x*nrm.x)-(nrm.y*nrm.y)) );
+	float x = (nrm.x*2.0f)-1.0f;
+	float y = (nrm.y*2.0f)-1.0f;
+	return float3( x, y, sqrt(1-(x*x)-(y*y)) );
 }
 
 
+
+PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
+{
+    PS_OUTPUT Out;                             //create an output pixel
+    
+    float2 uv = In.PositionVS.xy;
+
+    // grab value from the GBuffer (packed normal/depth)
+    float4 gvalue = tex2D( GBufferSampler, uv );
+    Out.Color = gvalue;
+    
+    // extract normal
+    float3 nrm = UnpackNormal( gvalue.xy );	// gets the normal in viewspace
+    //Out.Color = float4( nrm, 1.0f );
+    //Out.Color = float4( (nrm.y+1.0f)/2.0f, 0.0f, 0.0f, 1.0f );
+    
+    // extract depth
+    float depth = F32_Decompress(gvalue.zw);
+	//Out.Color = float4( depth, depth, depth, 1.0f );
+    
+    // dot product light vector and normal gives us the light at that point/pixel
+    float lightValue = saturate( dot( nrm, LightDirVS ) );
+    Out.Color = float4(lightValue * LightColourDif, 1.0f);
+    
+    return Out;
+}
+
+/*
 PS_OUTPUT ps_light( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
@@ -111,21 +162,32 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
     // calculate distance and direction to light
     float3 lightDir = sub(PixelPos, LightPos);
     float lightDist = length( lightDir );
-    lightDir = normalize( lightDir );
+    lightDir = normalize( lightDir );		// lightDir needs to be in ViewSpace!!
     
-    // for directional light:
-    // diffuse = dot(N,L) * Di * Dc			( N=surface normal,  L=light direction,  Di=light intensity,  Dc=light colour
+    // alternatively use 1D texture to encode falloff upto light radius
+    // for now use linear falloff: 1-(lightDist/LightRadius)
     
-    // for point light
-    // diffuse = dot(N,L) * S * Att			( S=distance to light,  Att=Attenuation )
+    float lightFalling = saturate( 1.0f - (lightDist/LightRadius) );
+
+	Out.Color = LightColour * lightFalling;
 
     return Out;                                //return output pixel
 }
+*/
 
 
 
+Technique DirectionalLight
+{
+	pass Pass0
+	{
+		VertexShader = compile vs_2_0 vs_light();
+		PixelShader  = compile ps_2_0 ps_DirLight();
+	}
+}
 
-Technique RenderToLightBuffer
+/*
+Technique PointLight
 {
 	pass Pass0
 	{
@@ -133,3 +195,4 @@ Technique RenderToLightBuffer
 		PixelShader  = compile ps_2_0 ps_light();
 	}
 }
+*/
