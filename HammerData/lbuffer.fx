@@ -8,15 +8,15 @@ float2		GBufferSize;		// dimensions of GBuffer texture
 
 
 // Shared light parameters
-float3 LightColourAmb;
-float3 LightColourDif = float3(1.0f, 1.0f, 1.0f);
+float3 LightColourAmb = float3(0.2f, 0.2f, 0.2f);
+float3 LightColourDif = float3(0.0f, 1.0f, 0.0f);
 
 // Point Light parameters
 float4 LightPosVS;	// need to be in view space
 float  LightRadius;
 
 // Directional Light parameters
-float4 LightDirVS;
+float3 LightDirVS;
 
 
 // G-Buffer texture lookup
@@ -137,43 +137,51 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
     // dot product light vector and normal gives us the light at that point/pixel
     float lightValue = saturate( dot( nrm, LightDirVS ) );
     Out.Color = float4(lightValue * LightColourDif, 1.0f);
+    Out.Color += float4( LightColourAmb, 1.0f );
     
     return Out;
 }
 
-/*
+
 PS_OUTPUT ps_light( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
     
     // lookup this pixel in the GBuffer to get the surface normal at this point
     // use the depth to calculate the distance from the light
-    
+    float2 uv = In.PositionVS.xy;
+
     // grab value from the GBuffer (packed normal/depth)
-    float4 gvalue = tex2D( GBufferSampler, In.ScreenUV );
+    float4 gvalue = tex2D( GBufferSampler, uv );
+    Out.Color = gvalue;
     
-    // extract normal and depth value
-    float3 nrm = UnpackNormal( gvalue.xy );
-    float depth = F32_Decompress( gvalue.zw );
+    // extract normal
+    float3 nrm = UnpackNormal( gvalue.xy );	// gets the normal in viewspace
+    //Out.Color = float4( nrm, 1.0f );
     
-    // reconstruct world space position of pixel from screenUV, depth and WorldViewProj
-    float3 pixelPos = ;
-    
+    // extract depth
+    float depth = F32_Decompress(gvalue.zw);
+	//Out.Color = float4( depth, depth, depth, 1.0f );
+
+	// need the pixel position in ViewSpace
+	float4 pixelPosVS = float4(0.0f, 0.0f, 0.0f, 1.0f);
+
+
     // calculate distance and direction to light
-    float3 lightDir = sub(PixelPos, LightPos);
-    float lightDist = length( lightDir );
-    lightDir = normalize( lightDir );		// lightDir needs to be in ViewSpace!!
+    float4 lightDir = pixelPosVS - LightPosVS;
+    float lightDist = length( lightDir.xyz );
+    lightDir = normalize( lightDir );
     
-    // alternatively use 1D texture to encode falloff upto light radius
+    // could use 1D texture to encode falloff upto light radius
     // for now use linear falloff: 1-(lightDist/LightRadius)
     
     float lightFalling = saturate( 1.0f - (lightDist/LightRadius) );
 
-	Out.Color = LightColour * lightFalling;
+	Out.Color = float4(LightColourDif * lightFalling, 1.0f);
 
     return Out;                                //return output pixel
 }
-*/
+
 
 
 
@@ -193,13 +201,20 @@ Technique DirectionalLight
 	}
 }
 
-/*
+
 Technique PointLight
 {
 	pass Pass0
 	{
+		// only write pixel if it passes the test
+		StencilEnable		= true;
+		StencilMask			= 0x1;
+		StencilRef			= 0x1;		
+		StencilPass			= KEEP;
+		StencilFunc			= EQUAL;
+
 		VertexShader = compile vs_2_0 vs_light();
 		PixelShader  = compile ps_2_0 ps_light();
 	}
 }
-*/
+

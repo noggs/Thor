@@ -88,7 +88,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     hWnd = CreateWindowEx(NULL,
                           L"WindowClass",
-                          L"Our First Direct3D Program",
+                          L"Thor",
                           WS_OVERLAPPEDWINDOW,
                           80, 0,
                           640, 480,
@@ -442,7 +442,11 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 
 IDirect3DTexture9* guiTexture = NULL;
 
-Thor::Vec4 gLightDir(1.0f, 0.0f, 0.0f, 0.0f);
+Thor::Vec4 gLightDir(-1.0f, 0.0f, 0.0f, 0.0f);
+Thor::Vec4 gLightPos(100.0f, 0.0f, 0.0f, 1.0f);
+float gLightRadius = 150.0f;
+
+
 
 // this is the function used to render a single frame
 void render_frame(void)
@@ -530,8 +534,10 @@ void render_frame(void)
 	{
 		D3DXVECTOR4 lightDir( gLightDir.GetX(), gLightDir.GetY(), gLightDir.GetZ(), gLightDir.GetW() );
 		D3DXVec4Transform( &lightDir, &lightDir, &matView );
-		pEffect_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 4 );
+		pEffect_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
 	}
+
+
 
 	pEffect_Lighting->SetTechnique("DirectionalLight");
 
@@ -546,6 +552,22 @@ void render_frame(void)
 		// use Gui system!
 		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
 		gui->Render(d3ddev);
+
+		// for each positional light...
+		{
+			// position in ViewSpace
+			D3DXVECTOR4 lightPos( gLightPos.GetX(), gLightPos.GetY(), gLightPos.GetZ(), gLightPos.GetW() );
+			D3DXVec4Transform( &lightPos, &lightPos, &matView );
+			pEffect_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 4 );
+
+			pEffect_Lighting->SetFloat( "LightRadius", gLightRadius );
+
+			pEffect_Lighting->CommitChanges();
+
+			// set sphere radius (scale) and render it
+			//gSphere->Render();
+		}
+
 
 		pEffect_Lighting->EndPass();
 	}
