@@ -122,6 +122,14 @@ Technique RenderToGBuffer
 {
 	pass Pass0
 	{
+		// enable stencil writes
+		StencilEnable		= true;
+		StencilMask			= 0x1;
+		StencilWriteMask	= 0x1;
+		StencilRef			= 0x1;		
+		StencilPass			= REPLACE;
+		StencilFunc			= ALWAYS;
+
         VertexShader = compile vs_2_0 vs_main();
         PixelShader  = compile ps_2_0 ps_packNormalDepth(); 
 	}

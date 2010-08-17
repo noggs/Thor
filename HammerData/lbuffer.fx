@@ -181,6 +181,13 @@ Technique DirectionalLight
 {
 	pass Pass0
 	{
+		// only write pixel if it passes the test
+		StencilEnable		= true;
+		StencilMask			= 0x1;
+		StencilRef			= 0x1;		
+		StencilPass			= KEEP;
+		StencilFunc			= EQUAL;
+
 		VertexShader = compile vs_2_0 vs_light();
 		PixelShader  = compile ps_2_0 ps_DirLight();
 	}

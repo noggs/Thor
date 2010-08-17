@@ -202,15 +202,15 @@ void initD3D(HWND hWnd)
     d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;    // discard old frames
     d3dpp.hDeviceWindow = hWnd;    // set the window to be used by Direct3D
 	d3dpp.EnableAutoDepthStencil = TRUE;
-	d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
+	d3dpp.AutoDepthStencilFormat = D3DFMT_D24S8;//D3DFMT_D16;
 
     // create a device class using this information and information from the d3dpp stuct
-    d3d->CreateDevice(D3DADAPTER_DEFAULT,
-                      D3DDEVTYPE_HAL,
-                      hWnd,
-                      D3DCREATE_SOFTWARE_VERTEXPROCESSING,
-                      &d3dpp,
-                      &d3ddev);
+    result = d3d->CreateDevice(	D3DADAPTER_DEFAULT,
+								D3DDEVTYPE_HAL,
+								hWnd,
+								D3DCREATE_SOFTWARE_VERTEXPROCESSING,
+								&d3dpp,
+								&d3ddev);
 
 	d3ddev->SetRenderState(D3DRS_AMBIENT,RGB(0,0,0));
 	d3ddev->SetRenderState(D3DRS_LIGHTING, false);
@@ -485,7 +485,7 @@ void render_frame(void)
 	// set G buffer rt
 	d3ddev->SetRenderTarget(0, pGBufferSurface);
 	// clear the rt
-	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
+	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL, 
 					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
 
 	// setup shader constants
