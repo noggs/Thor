@@ -3,6 +3,7 @@
 float4x4	WorldViewProj;		// matrix from ObjectSpace to ClipSpace
 float4x4	WorldView;			// matrix from ObjectSpace to EyeSpace
 float4x4	InvWorldViewProj;	// matrix to unproject a point from ClipSpace back to ObjectSpace
+float4x4	InvProj;			// matrix to unproject from ClipSpace to ViewSpace
 float		FarClip;			// farclip plane distance
 float2		GBufferSize;		// dimensions of GBuffer texture
 
@@ -25,9 +26,9 @@ sampler GBufferSampler =
 sampler_state
 {
 	Texture = <GBufferTexture>;
-	MipFilter = NONE;
-	MinFilter = NONE;
-	MagFilter = NONE;
+	MipFilter = POINT;
+	MinFilter = POINT;
+	MagFilter = POINT;
 };
 
 
@@ -153,7 +154,7 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
 
     // grab value from the GBuffer (packed normal/depth)
     float4 gvalue = tex2D( GBufferSampler, uv );
-    Out.Color = gvalue;
+    //Out.Color = gvalue;
     
     // extract normal
     float3 nrm = UnpackNormal( gvalue.xy );	// gets the normal in viewspace
@@ -161,11 +162,14 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
     
     // extract depth
     float depth = F32_Decompress(gvalue.zw);
-	//Out.Color = float4( depth, depth, depth, 1.0f );
+	Out.Color = float4( depth, depth, depth, 1.0f );
 
-	// need the pixel position in ViewSpace
-	float4 pixelPosVS = float4(0.0f, 0.0f, 0.0f, 1.0f);
+	// get the pixel position in ViewSpace
+	float x = In.PositionVS.x * 2 - 1;
+    float y = (1 - In.PositionVS.y) * 2 - 1;
+	float4 projPixelPos = mul( float4(x, y, depth, 1.0f), InvProj );	// EXPENSIVE!
 
+	float4 pixelPosVS = float4( projPixelPos.xyz / projPixelPos.w, 1.0f ); 	
 
     // calculate distance and direction to light
     float4 lightDir = pixelPosVS - LightPosVS;
@@ -175,9 +179,20 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
     // could use 1D texture to encode falloff upto light radius
     // for now use linear falloff: 1-(lightDist/LightRadius)
     
-    float lightFalling = saturate( 1.0f - (lightDist/LightRadius) );
+    float att = saturate( 1.0f - (lightDist/LightRadius) );
+    float NL = dot( lightDir, nrm ) * att;
 
-	Out.Color = float4(LightColourDif * lightFalling, 1.0f);
+	//Out.Color = float4(LightColourDif * NL, 1.0f);
+
+	// now calculate specular component
+	float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
+	float SpecularPower_0 = 10.0f;
+	float specular = pow( saturate( dot( reflect(eyeVec, nrm), lightDir)), SpecularPower_0);
+	
+	//Out.Color = float4( specular, specular, specular, 1.0f );
+	
+	// write diffuse colour in xyz and specular term in w channel
+	Out.Color = float4(LightColourDif * NL, specular);
 
     return Out;                                //return output pixel
 }

@@ -91,7 +91,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
                           L"Thor",
                           WS_OVERLAPPEDWINDOW,
                           80, 0,
-                          640, 480,
+                          800, 600,
                           NULL,
                           NULL,
                           hInstance,
@@ -160,8 +160,9 @@ LPD3DXCONSTANTTABLE          constantTable = NULL; //ConstantTable (NEW)
 LPDIRECT3DPIXELSHADER9       pixelShader = NULL; //PS (NEW)
 LPDIRECT3DPIXELSHADER9       GBufferShader = NULL; //PS (NEW)
 
-ID3DXEffect*				pEffect_GBuffer = NULL;
-ID3DXEffect*				pEffect_Lighting = NULL;
+ID3DXEffect*				pFX_GBuffer = NULL;
+ID3DXEffect*				pFX_Lighting = NULL;
+ID3DXEffect*				pFX_Model = NULL;
 
 LPDIRECT3DTEXTURE9 pGBufferTexture = NULL, pLightBufferTexture = NULL;
 LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pLightBufferSurface = NULL, pBackBuffer = NULL;
@@ -203,6 +204,7 @@ void initD3D(HWND hWnd)
     d3dpp.hDeviceWindow = hWnd;    // set the window to be used by Direct3D
 	d3dpp.EnableAutoDepthStencil = TRUE;
 	d3dpp.AutoDepthStencilFormat = D3DFMT_D24S8;//D3DFMT_D16;
+	d3dpp.BackBufferCount = 1;
 
     // create a device class using this information and information from the d3dpp stuct
     result = d3d->CreateDevice(	D3DADAPTER_DEFAULT,
@@ -221,22 +223,6 @@ void initD3D(HWND hWnd)
 
 	gui = new Thor::Gui(d3ddev);
 
-	// create a light
-	D3DLIGHT9 Light;
-	ZeroMemory(&Light,sizeof(Light));
-	Light.Type = D3DLIGHT_DIRECTIONAL;
-	Light.Diffuse.r = 1.0f;
-	Light.Diffuse.g = 1.0f;
-	Light.Diffuse.b = 1.0f;
-	Light.Direction.x = 1.0f;
-	Light.Direction.y = 0.0f;
-	Light.Direction.z = 1.0f;
-	Light.Range = 1000.0f;
-
-	d3ddev->SetLight(0,&Light);  //set the light (NEW)
-	//d3ddev->LightEnable(0,true); //enables the light (NEW)
-
-
 	D3DVERTEXELEMENT9 decl[] = {
 		{0,0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,0},
 		{0,12,D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD,0},
@@ -249,79 +235,6 @@ void initD3D(HWND hWnd)
 
 	LPCSTR vshProf = D3DXGetVertexShaderProfile( d3ddev );
 	LPCSTR pshProf = D3DXGetPixelShaderProfile( d3ddev );
-
-
-	//set up Vertex Shader (NEW)
-	result = D3DXCompileShaderFromFile(
-				L"vertex.vsh",   //filepath
-				NULL,            //macro's
-				NULL,            //includes
-				"vs_main",       //main function
-				"vs_2_0",        //shader profile
-				0,               //flags
-				&code,           //compiled operations
-				&errors,         //errors
-				&constantTable); //constants
-
-	if(SUCCEEDED(result))
-	{
-		d3ddev->CreateVertexShader((DWORD*)code->GetBufferPointer(), &vertexShader);
-		code->Release();
-	}
-	else
-	{
-		char* szErrors = (char*)errors->GetBufferPointer();
-		errors->Release();
-	}
-
-	//set up Pixel Shader (NEW)
-	result = D3DXCompileShaderFromFile(
-				L"pixel.psh",  //filepath
-				NULL,          //macro's            
-				NULL,          //includes           
-				"ps_main",     //main function      
-				"ps_2_0",      //shader profile     
-				0,             //flags              
-				&code,         //compiled operations
-				&errors,       //errors
-				NULL);         //constants
-
-	if(SUCCEEDED(result))
-	{
-		d3ddev->CreatePixelShader((DWORD*)code->GetBufferPointer(), &pixelShader);
-		code->Release();
-	}
-	else
-	{
-		char* szErrors = (char*)errors->GetBufferPointer();
-		errors->Release();
-	}
-
-
-	
-
-	//set up Pixel Shader (NEW)
-	result = D3DXCompileShaderFromFile(
-				L"gbuffer.psh",  //filepath
-				NULL,          //macro's            
-				NULL,          //includes           
-				"ps_main",     //main function      
-				"ps_2_0",      //shader profile     
-				0,             //flags              
-				&code,         //compiled operations
-				&errors,       //errors
-				NULL);         //constants
-
-	if(SUCCEEDED(result))
-	{
-		d3ddev->CreatePixelShader((DWORD*)code->GetBufferPointer(), &GBufferShader);
-		code->Release();
-	}
-	else
-	{
-		char* szErrors = (char*)errors->GetBufferPointer();
-		errors->Release();
-	}
 
 
 	//////
@@ -365,7 +278,7 @@ void initD3D(HWND hWnd)
 
 
 	result = D3DXCreateEffectFromFile( d3ddev, L"gbuffer.fx", NULL, NULL, 
-										0, NULL, &pEffect_GBuffer, &errors );
+										0, NULL, &pFX_GBuffer, &errors );
 
 	if(FAILED(result))
 	{
@@ -375,13 +288,21 @@ void initD3D(HWND hWnd)
 
 
 	result = D3DXCreateEffectFromFile( d3ddev, L"lbuffer.fx", NULL, NULL,
-										0, NULL, &pEffect_Lighting, &errors );
+										0, NULL, &pFX_Lighting, &errors );
 	if( FAILED( result ) )
 	{
 		char* szErrors = (char*)errors->GetBufferPointer();
 		errors->Release();
 	}
 
+
+	//result = D3DXCreateEffectFromFile( d3ddev, L"model.fx", NULL, NULL,
+	//									0, NULL, &pFX_Model, &errors );
+	//if( FAILED( result ) )
+	//{
+	//	char* szErrors = (char*)errors->GetBufferPointer();
+	//	errors->Release();
+	//}
 
 }
 
@@ -443,10 +364,15 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 IDirect3DTexture9* guiTexture = NULL;
 
 Thor::Vec4 gLightDir(-1.0f, 0.0f, 0.0f, 0.0f);
-Thor::Vec4 gLightPos(100.0f, 0.0f, 0.0f, 1.0f);
-float gLightRadius = 150.0f;
+Thor::Vec4 gLightPos(100.0f, 100.0f, 0.0f, 1.0f);
+float gLightRadius = 250.0f;
 
-
+struct Light
+{
+	Thor::Vec4 pos;
+	float radius;
+	float colour[4];
+};
 
 // this is the function used to render a single frame
 void render_frame(void)
@@ -480,6 +406,9 @@ void render_frame(void)
 	// calculate WorldView matrix
 	D3DXMATRIXA16 matWorldView = matWorld * matView;
 
+	D3DXMATRIXA16 matInvProj;
+	D3DXMatrixInverse( &matInvProj, NULL, &matProj );
+
 	////////////////////
 	// Step 1 - render the scene into GBuffer storing normals and depth
 
@@ -492,25 +421,33 @@ void render_frame(void)
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL, 
 					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
 
+	d3ddev->BeginScene();
+
 	// setup shader constants
-	pEffect_GBuffer->SetMatrix( "WorldViewProj", &matWorldViewProj);
-	pEffect_GBuffer->SetMatrix( "WorldView", &matWorldView);
-	pEffect_GBuffer->SetFloat( "FarClip", gFarClip );
+	pFX_GBuffer->SetMatrix( "WorldViewProj", &matWorldViewProj);
+	pFX_GBuffer->SetMatrix( "WorldView", &matWorldView);
+	pFX_GBuffer->SetFloat( "FarClip", gFarClip );
 
 	// Apply the technique contained in the effect 
 	UINT cPasses, iPass;
-	pEffect_GBuffer->Begin(&cPasses, 0);
+	pFX_GBuffer->Begin(&cPasses, 0);
 
 	for (iPass = 0; iPass < cPasses; iPass++)
 	{
-		pEffect_GBuffer->BeginPass(iPass);
+		pFX_GBuffer->BeginPass(iPass);
+
+		d3ddev->SetVertexDeclaration( vertexDecl );
 
 		// Render the mesh with the applied technique
 		gModel->Render();
 
-		pEffect_GBuffer->EndPass();
+		d3ddev->SetVertexDeclaration( NULL );
+
+		pFX_GBuffer->EndPass();
 	}
-	pEffect_GBuffer->End();
+	pFX_GBuffer->End();
+
+	d3ddev->EndScene();
 
 
 	/////////////////////
@@ -522,31 +459,35 @@ void render_frame(void)
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
 					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
 
-	pEffect_Lighting->SetMatrix( "WorldViewProj", &matWorldViewProj);
-	pEffect_Lighting->SetMatrix( "WorldView", &matWorldView);
-	pEffect_Lighting->SetFloat( "FarClip", gFarClip );
+	d3ddev->BeginScene();
 
+	pFX_Lighting->SetMatrix( "WorldViewProj", &matWorldViewProj);
+	pFX_Lighting->SetMatrix( "WorldView", &matWorldView);
+	pFX_Lighting->SetMatrix( "InvProj", &matInvProj );
+	pFX_Lighting->SetFloat( "FarClip", gFarClip );
+
+	
 	float gbufferSize[] = {256.0f, 256.0f };
-	pEffect_Lighting->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
+	pFX_Lighting->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
 
 	
 	// transform directional light vector into view space
 	{
 		D3DXVECTOR4 lightDir( gLightDir.GetX(), gLightDir.GetY(), gLightDir.GetZ(), gLightDir.GetW() );
 		D3DXVec4Transform( &lightDir, &lightDir, &matView );
-		pEffect_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
+		pFX_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
 	}
 
 
-
-	pEffect_Lighting->SetTechnique("DirectionalLight");
+#if 0
+	pFX_Lighting->SetTechnique("DirectionalLight");
 
 	// Apply the technique contained in the effect 
-	pEffect_Lighting->Begin(&cPasses, 0);
+	pFX_Lighting->Begin(&cPasses, 0);
 
 	for (iPass = 0; iPass < cPasses; iPass++)
 	{
-		pEffect_Lighting->BeginPass(iPass);
+		pFX_Lighting->BeginPass(iPass);
 
 		// Render a full screen quad for the directional light pass
 		// use Gui system!
@@ -558,20 +499,61 @@ void render_frame(void)
 			// position in ViewSpace
 			D3DXVECTOR4 lightPos( gLightPos.GetX(), gLightPos.GetY(), gLightPos.GetZ(), gLightPos.GetW() );
 			D3DXVec4Transform( &lightPos, &lightPos, &matView );
-			pEffect_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 4 );
+			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 4 );
 
-			pEffect_Lighting->SetFloat( "LightRadius", gLightRadius );
+			pFX_Lighting->SetFloat( "LightRadius", gLightRadius );
 
-			pEffect_Lighting->CommitChanges();
+			pFX_Lighting->CommitChanges();
 
 			// set sphere radius (scale) and render it
 			//gSphere->Render();
 		}
 
 
-		pEffect_Lighting->EndPass();
+		pFX_Lighting->EndPass();
 	}
-	pEffect_Lighting->End();
+	pFX_Lighting->End();
+#endif
+
+	d3ddev->EndScene();
+
+	d3ddev->BeginScene();
+
+
+	pFX_Lighting->SetTechnique("PointLight");
+
+	// Apply the technique contained in the effect 
+	pFX_Lighting->Begin(&cPasses, 0);
+	for (iPass = 0; iPass < cPasses; iPass++)
+	{
+		pFX_Lighting->BeginPass(iPass);
+
+		// Render a full screen quad for the light pass
+		// use Gui system!
+		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+		gui->Render(d3ddev);
+
+		// for each positional light...
+		{
+			// position in ViewSpace
+			D3DXVECTOR4 lightPos( gLightPos.GetX(), gLightPos.GetY(), gLightPos.GetZ(), gLightPos.GetW() );
+			D3DXVec4Transform( &lightPos, &lightPos, &matView );
+			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 4 );
+
+			pFX_Lighting->SetFloat( "LightRadius", gLightRadius );
+
+			pFX_Lighting->CommitChanges();
+
+			// set sphere radius (scale) and render it
+			//gSphere->Render();
+		}
+
+
+		pFX_Lighting->EndPass();
+	}
+	pFX_Lighting->End();
+
+	d3ddev->EndScene();
 
 
 	/////////////////////

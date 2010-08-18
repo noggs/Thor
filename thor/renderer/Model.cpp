@@ -141,7 +141,7 @@ void Model::LoadModel(const char* filename)
 		IndexBuffer* pIndexBuffer;
 		ret = d3ddev->CreateIndexBuffer( 
 			numFaces * 3 * sizeof(short), 
-			0,
+			D3DUSAGE_WRITEONLY,
 			D3DFMT_INDEX16,
 			D3DPOOL_DEFAULT,
 			&pIndexBuffer, 

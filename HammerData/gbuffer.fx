@@ -22,7 +22,7 @@ struct VS_OUTPUT
     float4 Position   : POSITION;
     float2 Texture    : TEXCOORD0;
     float3 Normal     : TEXCOORD1;
-    float  Depth      : TEXCOORD2;
+    float2 Depth      : TEXCOORD2;
 };
 
 
@@ -42,7 +42,8 @@ VS_OUTPUT vs_main( in VS_INPUT In )
     Out.Normal = -normalize(mul(In.Normal, WorldViewProj)); // transform Normal and normalize
 
 	// non-linear depth
-	Out.Depth = (Out.Position.z/Out.Position.w); 
+	//Out.Depth = (Out.Position.z/Out.Position.w); 
+	Out.Depth = Out.Position.zw;
 	
 	// linear depth
 	//float4 eyeSpacePos = mul(In.Position, WorldView);
@@ -94,6 +95,8 @@ float3 UnpackNormal(float2 nrm)
 PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
+    
+    float depth = In.Depth.x / In.Depth.y;	// z / w
 
 	//Out.Color = float4(In.Normal, 1.0f);
 	//Out.Color = float4(In.Depth, In.Depth, In.Depth, 1.0f);
@@ -102,7 +105,7 @@ PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
 	//Out.Color = float4(In.Normal.x, In.Normal.y, 0.0f, 0.0f);
 	//Out.Color = float4(F32_Compress(In.Depth), 0.0f, 1.0f );
 	
-	Out.Color = float4( PackNormal(In.Normal.xyz), F32_Compress(In.Depth) );
+	Out.Color = float4( PackNormal(In.Normal.xyz), F32_Compress(depth) );
 	
 	// test unpacking the depth
 	//float unpacked = F32_Decompress(Out.Color.zw);
