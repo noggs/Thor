@@ -17,9 +17,8 @@ Gui::Gui(IDirect3DDevice9* d3ddev)
 	mMaxVerts = 1024;
 
 	// create vertex buffer
-	ret = d3ddev->CreateVertexBuffer(mMaxVerts * vertSize, D3DUSAGE_WRITEONLY, dxFormat, 
+	ret = d3ddev->CreateVertexBuffer(mMaxVerts * vertSize, D3DUSAGE_DYNAMIC|D3DUSAGE_WRITEONLY, dxFormat, 
 									 D3DPOOL_DEFAULT, &mVertexBuffer, NULL);
-
 }
 
 
@@ -29,7 +28,7 @@ void Gui::DrawTexturedRect(int left, int top, int width, int height, IDirect3DTe
 
 	HRESULT res;
 	void* buffer;
-	res = mVertexBuffer->Lock( mCurrentOffset, 6, &buffer, 0 );
+	res = mVertexBuffer->Lock( mCurrentOffset, 6*sizeof(GuiVertex), &buffer, 0 );
 	if( SUCCEEDED(res) )
 	{
 		float fLeft = (float)left;
@@ -51,7 +50,7 @@ void Gui::DrawTexturedRect(int left, int top, int width, int height, IDirect3DTe
 		mVertexBuffer->Unlock();
 
 		// record we've added these verts to the buffer
-		mCurrentOffset += 6 * sizeof(GuiVertex);
+		mCurrentOffset += 6*sizeof(GuiVertex);
 
 		// add command to the queue
 		GuiCmd& cmd = mCommands[mNumCommands++];
@@ -80,7 +79,7 @@ void Gui::Render(IDirect3DDevice9 *d3ddev)
 			const GuiCmd& cmd = mCommands[i];
 
 			res = d3ddev->SetTexture(0, cmd.tex);
-			res = d3ddev->DrawPrimitive(D3DPT_TRIANGLELIST, vert, cmd.numVerts);
+			res = d3ddev->DrawPrimitive(D3DPT_TRIANGLELIST, vert, cmd.numVerts / 3);
 
 			vert += cmd.numVerts;
 		}

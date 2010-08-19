@@ -1,11 +1,13 @@
 
+float4x4	WorldViewProj;		// matrix from ObjectSpace to ClipSpace
+float2		GBufferSize;		// dimensions of GBuffer texture
 
 
-// G-Buffer texture lookup
-texture GBufferTexture;
-sampler GBufferSampler = sampler_state
+// Lighting buffer texture lookup
+texture LightBufferTexture;
+sampler LightBufferSampler = sampler_state
 {
-	Texture = <GBufferTexture>;
+	Texture = <LightBufferTexture>;
 	MipFilter = POINT;
 	MinFilter = POINT;
 	MagFilter = POINT;
@@ -26,7 +28,7 @@ struct VS_OUTPUT
 {
     float4 Position   : POSITION;
     float2 Texture    : TEXCOORD0;
-    float4 PositionVS : TEXCOORD1;		// lookup into Lighting buffer
+    float2 LookupUV   : TEXCOORD1;		// lookup into Lighting buffer
 };
 
 
@@ -40,7 +42,11 @@ VS_OUTPUT vs_main( in VS_INPUT In )
     VS_OUTPUT Out;                      //create an output vertex
 
     Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
-    Out.PositionVS = Out.Position;		// maybe we only need xy for gbuffer lookup?
+
+	// Offset the position by half a pixel to correctly
+	// align texels to pixels. Only necessary for D3D9 or XNA
+	Out.LookupUV.x = Out.Position.x - (1.0f/GBufferSize.x);
+	Out.LookupUV.y = Out.Position.y + (1.0f/GBufferSize.y);
 
     Out.Texture  = In.Texture;          //copy original texcoords
 
@@ -61,6 +67,11 @@ struct PS_OUTPUT
 PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
+    
+    // grab value from the GBuffer (packed normal/depth)
+    float4 lighting = tex2D( LightBufferSampler, In.LookupUV );
+
+	Out.Color = float4( lighting.xyz, 1.0f );
 
     return Out;                                //return output pixel
 }

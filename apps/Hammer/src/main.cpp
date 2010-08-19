@@ -241,7 +241,7 @@ void initD3D(HWND hWnd)
 	// Create G Buffer
 
 	result = d3ddev->CreateTexture( 
-				256, 256, 1,
+				512, 512, 1,
 				D3DUSAGE_RENDERTARGET,
 				D3DFMT_A8R8G8B8,
 				D3DPOOL_DEFAULT,
@@ -255,7 +255,7 @@ void initD3D(HWND hWnd)
 	// Create Light buffer
 
 	result = d3ddev->CreateTexture(
-				256, 256, 1,
+				512, 512, 1,
 				D3DUSAGE_RENDERTARGET,
 				D3DFMT_A8R8G8B8,
 				D3DPOOL_DEFAULT,
@@ -296,13 +296,13 @@ void initD3D(HWND hWnd)
 	}
 
 
-	//result = D3DXCreateEffectFromFile( d3ddev, L"model.fx", NULL, NULL,
-	//									0, NULL, &pFX_Model, &errors );
-	//if( FAILED( result ) )
-	//{
-	//	char* szErrors = (char*)errors->GetBufferPointer();
-	//	errors->Release();
-	//}
+	result = D3DXCreateEffectFromFile( d3ddev, L"model.fx", NULL, NULL,
+										0, NULL, &pFX_Model, &errors );
+	if( FAILED( result ) )
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
+	}
 
 }
 
@@ -363,16 +363,21 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 
 IDirect3DTexture9* guiTexture = NULL;
 
-Thor::Vec4 gLightDir(-1.0f, 0.0f, 0.0f, 0.0f);
-Thor::Vec4 gLightPos(100.0f, 100.0f, 0.0f, 1.0f);
-float gLightRadius = 250.0f;
+Thor::Vec4 gDirLightPos(0.7f, 0.0f, -0.7f, 0.0f);
+float gDirLightColour[] = {0.0f, 0.0f, 1.0f};
 
 struct Light
 {
 	Thor::Vec4 pos;
 	float radius;
-	float colour[4];
+	float colour[3];
 };
+
+Light gPointLights[] = {
+	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {1.0f, 0.0f, 0.0f} },
+	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.0f, 1.0f, 0.0f} }
+};
+int gPointLightsNum = 2;
 
 // this is the function used to render a single frame
 void render_frame(void)
@@ -467,21 +472,27 @@ void render_frame(void)
 	pFX_Lighting->SetFloat( "FarClip", gFarClip );
 
 	
-	float gbufferSize[] = {256.0f, 256.0f };
+	float gbufferSize[] = {512.0f, 512.0f };
+	//float gbufferSize[] = {256.0f, 256.0f };
 	pFX_Lighting->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
 
 	
 	// transform directional light vector into view space
 	{
-		D3DXVECTOR4 lightDir( gLightDir.GetX(), gLightDir.GetY(), gLightDir.GetZ(), gLightDir.GetW() );
+		D3DXVECTOR4 lightDir( gDirLightPos.GetX(), gDirLightPos.GetY(), gDirLightPos.GetZ(), gDirLightPos.GetW() );
 		D3DXVec4Transform( &lightDir, &lightDir, &matView );
 		pFX_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
 	}
 
 
-#if 0
+	//////////////////////////////////////////////////////////////////////////
+	// Render directional/ambient first
+
 	pFX_Lighting->SetTechnique("DirectionalLight");
 
+	pFX_Lighting->SetFloatArray( "LightColourDif", &gDirLightColour[0], 3 );
+
+#if 0
 	// Apply the technique contained in the effect 
 	pFX_Lighting->Begin(&cPasses, 0);
 
@@ -491,24 +502,8 @@ void render_frame(void)
 
 		// Render a full screen quad for the directional light pass
 		// use Gui system!
-		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+		gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
 		gui->Render(d3ddev);
-
-		// for each positional light...
-		{
-			// position in ViewSpace
-			D3DXVECTOR4 lightPos( gLightPos.GetX(), gLightPos.GetY(), gLightPos.GetZ(), gLightPos.GetW() );
-			D3DXVec4Transform( &lightPos, &lightPos, &matView );
-			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 4 );
-
-			pFX_Lighting->SetFloat( "LightRadius", gLightRadius );
-
-			pFX_Lighting->CommitChanges();
-
-			// set sphere radius (scale) and render it
-			//gSphere->Render();
-		}
-
 
 		pFX_Lighting->EndPass();
 	}
@@ -517,10 +512,12 @@ void render_frame(void)
 
 	d3ddev->EndScene();
 
-	d3ddev->BeginScene();
-
+	//////////////////////////////////////////////////////////////////////////
+	// Now render all the point lights
 
 	pFX_Lighting->SetTechnique("PointLight");
+
+	d3ddev->BeginScene();
 
 	// Apply the technique contained in the effect 
 	pFX_Lighting->Begin(&cPasses, 0);
@@ -528,24 +525,24 @@ void render_frame(void)
 	{
 		pFX_Lighting->BeginPass(iPass);
 
-		// Render a full screen quad for the light pass
-		// use Gui system!
-		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
-		gui->Render(d3ddev);
-
 		// for each positional light...
+		for(int i=0; i<gPointLightsNum; ++i)
 		{
-			// position in ViewSpace
-			D3DXVECTOR4 lightPos( gLightPos.GetX(), gLightPos.GetY(), gLightPos.GetZ(), gLightPos.GetW() );
-			D3DXVec4Transform( &lightPos, &lightPos, &matView );
-			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 4 );
+			const Light& light = gPointLights[i];
 
-			pFX_Lighting->SetFloat( "LightRadius", gLightRadius );
+			// position in ViewSpace
+			D3DXVECTOR4 lightPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), light.pos.GetW() );
+			D3DXVec4Transform( &lightPos, &lightPos, &matView );
+			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 3 );
+			pFX_Lighting->SetFloatArray( "LightColourDif", &light.colour[0], 3 );
+			pFX_Lighting->SetFloat( "LightRadius", light.radius );
 
 			pFX_Lighting->CommitChanges();
 
-			// set sphere radius (scale) and render it
-			//gSphere->Render();
+			// Render a full screen quad for the light - room for improvement here :)
+			gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
+			gui->Render(d3ddev);
+
 		}
 
 
