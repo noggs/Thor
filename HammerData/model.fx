@@ -8,9 +8,9 @@ texture LightBufferTexture;
 sampler LightBufferSampler = sampler_state
 {
 	Texture = <LightBufferTexture>;
-	MipFilter = POINT;
-	MinFilter = POINT;
-	MagFilter = POINT;
+	MipFilter = LINEAR;
+	MinFilter = LINEAR;
+	MagFilter = LINEAR;
 };
 
 
@@ -68,8 +68,14 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
     
+    float2 uv = In.LookupUV / 512;
+    uv.y = -uv.y + 0.5f;
+    uv.x += 0.5f;
+    
     // grab value from the GBuffer (packed normal/depth)
-    float4 lighting = tex2D( LightBufferSampler, In.LookupUV );
+    float4 lighting = tex2D( LightBufferSampler, uv );
+    
+    Out.Color = float4( In.LookupUV, 0.0f, 1.0f );
 
 	Out.Color = float4( lighting.xyz, 1.0f );
 

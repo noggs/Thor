@@ -542,9 +542,7 @@ void render_frame(void)
 			// Render a full screen quad for the light - room for improvement here :)
 			gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
 			gui->Render(d3ddev);
-
 		}
-
 
 		pFX_Lighting->EndPass();
 	}
@@ -563,6 +561,18 @@ void render_frame(void)
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
 					D3DCOLOR_XRGB(0, 40, 100), 1.0f, 0);
 	d3ddev->BeginScene();    // begins the 3D scene
+
+		pFX_Model->SetMatrix( "WorldViewProj", &matWorldViewProj);
+		pFX_Model->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
+		pFX_Model->SetTexture( "LightBufferTexture", pLightBufferTexture );
+
+		pFX_Model->Begin(&cPasses, 0);
+			pFX_Model->BeginPass(0);
+
+			gModel->Render();
+
+			pFX_Model->EndPass();
+		pFX_Model->End();
 
 		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
 		gui->DrawTexturedRect(256, 0, 256, 256, pLightBufferTexture );
