@@ -11,6 +11,8 @@ sampler LightBufferSampler = sampler_state
 	MipFilter = LINEAR;
 	MinFilter = LINEAR;
 	MagFilter = LINEAR;
+	AddressU = CLAMP;
+	AddressV = CLAMP;
 };
 
 
@@ -45,8 +47,8 @@ VS_OUTPUT vs_main( in VS_INPUT In )
 
 	// Offset the position by half a pixel to correctly
 	// align texels to pixels. Only necessary for D3D9 or XNA
-	Out.LookupUV.x = Out.Position.x - (1.0f/GBufferSize.x);
-	Out.LookupUV.y = Out.Position.y + (1.0f/GBufferSize.y);
+	Out.LookupUV.x = Out.Position.x / Out.Position.w;// - (1.0f/GBufferSize.x);
+	Out.LookupUV.y = Out.Position.y / Out.Position.w;// + (1.0f/GBufferSize.y);
 
     Out.Texture  = In.Texture;          //copy original texcoords
 
@@ -68,15 +70,15 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
     
-    float2 uv = In.LookupUV / 512;
-    uv.y = -uv.y + 0.5f;
-    uv.x += 0.5f;
-    
+    float2 uv = float2(
+		(0.5f * In.LookupUV.x) + 0.5f,
+		(0.5f * -In.LookupUV.y) + 0.5f);
+
+    //Out.Color = float4( uv, 0.0f, 1.0f );
+
     // grab value from the GBuffer (packed normal/depth)
     float4 lighting = tex2D( LightBufferSampler, uv );
     
-    Out.Color = float4( In.LookupUV, 0.0f, 1.0f );
-
 	Out.Color = float4( lighting.xyz, 1.0f );
 
     return Out;                                //return output pixel

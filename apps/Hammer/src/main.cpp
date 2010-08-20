@@ -313,7 +313,7 @@ float gFarClip = 900.0f;
 void SetupCamera(void)
 {
 	D3DXMATRIXA16 ProjectionMatrix;
-	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, 1.0f, gNearClip, gFarClip);
+	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, 800.0f/600.0f, gNearClip, gFarClip);
 	d3ddev->SetTransform(D3DTS_PROJECTION, &ProjectionMatrix);
 
 	Thor::Matrix ViewMatrix;
