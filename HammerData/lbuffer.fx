@@ -142,8 +142,7 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
 	
 	// now calculate specular component
 	float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
-	float SpecularPower_0 = 10.0f;
-	float specular = pow( saturate( dot( reflect(eyeVec, nrm), LightDirVS)), SpecularPower_0);
+	float specular = saturate( dot( reflect(eyeVec, nrm), LightDirVS)) / 10;
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
     
@@ -151,7 +150,9 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
 	Out.Color = float4(LightColourDif * NL, specular);
 	
 	// add specular in here for debug
-	Out.Color += float4( specular, specular, specular, 0.0f );
+	//Out.Color += float4( specular, specular, specular, 0.0f );
+	
+	//Out.Color = float4( specular, specular, specular, specular );
     
     return Out;
 }
@@ -203,8 +204,7 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
 
 	// now calculate specular component
 	float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
-	float SpecularPower_0 = 10.0f;
-	float specular = pow( saturate( dot( reflect(eyeVec, nrm), lightDir)), SpecularPower_0);
+	float specular = saturate( dot( reflect(eyeVec, nrm), LightDirVS)) / 10;
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
 	
@@ -212,8 +212,9 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
 	Out.Color = float4(LightColourDif * NL, specular);
 	
 	// add specular in here for debug
-	Out.Color += float4( specular, specular, specular, 0.0f );
+	//Out.Color += float4( specular, specular, specular, 0.0f );
 
+	//Out.Color = float4( specular, specular, specular, specular );
 
     return Out;                                //return output pixel
 }

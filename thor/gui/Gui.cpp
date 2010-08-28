@@ -28,7 +28,7 @@ void Gui::DrawTexturedRect(int left, int top, int width, int height, IDirect3DTe
 
 	HRESULT res;
 	void* buffer;
-	res = mVertexBuffer->Lock( mCurrentOffset, 6*sizeof(GuiVertex), &buffer, 0 );
+	res = mVertexBuffer->Lock( mCurrentOffset, 6*sizeof(GuiVertex), &buffer, D3DLOCK_NOOVERWRITE );
 	if( SUCCEEDED(res) )
 	{
 		float fLeft = (float)left;

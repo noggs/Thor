@@ -16,6 +16,19 @@ sampler LightBufferSampler = sampler_state
 };
 
 
+// diffuse colour map
+texture DiffuseMap;
+sampler DiffuseSampler = sampler_state {
+	Texture = <DiffuseMap>;
+	MipFilter = LINEAR;
+	MinFilter = LINEAR;
+	MagFilter = LINEAR;
+	AddressU = CLAMP;
+	AddressV = CLAMP;
+};
+
+
+
 // Vertex shader input structure
 struct VS_INPUT
 {
@@ -45,12 +58,10 @@ VS_OUTPUT vs_main( in VS_INPUT In )
 
     Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
 
-	// Offset the position by half a pixel to correctly
-	// align texels to pixels. Only necessary for D3D9 or XNA
-	Out.LookupUV.x = Out.Position.x / Out.Position.w;// - (1.0f/GBufferSize.x);
-	Out.LookupUV.y = Out.Position.y / Out.Position.w;// + (1.0f/GBufferSize.y);
+	Out.LookupUV.x = Out.Position.x / Out.Position.w;
+	Out.LookupUV.y = Out.Position.y / Out.Position.w;
 
-    Out.Texture  = In.Texture;          //copy original texcoords
+    Out.Texture  = float2(In.Texture.x, 1-In.Texture.y);          //invert Y for some reason?
 
     return Out;                         //return output vertex
 }
@@ -73,13 +84,28 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
     float2 uv = float2(
 		(0.5f * In.LookupUV.x) + 0.5f,
 		(0.5f * -In.LookupUV.y) + 0.5f);
+		
+	uv += 0.5f / GBufferSize;
 
     //Out.Color = float4( uv, 0.0f, 1.0f );
 
-    // grab value from the GBuffer (packed normal/depth)
+    // grab value from the Lighting Buffer (diffuse xyz, specular w)
     float4 lighting = tex2D( LightBufferSampler, uv );
     
-	Out.Color = float4( lighting.xyz, 1.0f );
+	float3 diffCol = float3( lighting.xyz );
+	
+	float SpecularPower_0 = 10.0f;
+	float specular = pow( lighting.w * 3.5, SpecularPower_0);
+	
+	//Out.Color = float4( specular, specular, specular, 1.0f );
+
+	
+	
+	// get diffuse colour here
+	float4 baseCol = float4( tex2D(DiffuseSampler, In.Texture) );
+	Out.Color = float4( baseCol.xyz * diffCol + specular, 1.0f );
+	
+	// Final output = baseColour * diffLighting * diffIntens + specular * specIntensity
 
     return Out;                                //return output pixel
 }

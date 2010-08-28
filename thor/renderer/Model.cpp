@@ -112,7 +112,7 @@ void Model::LoadModel(const char* filename)
 
 		int vertSize = sizeof(float) * 3;
 		if( fmt & bb::BIT_UV1 ) {
-			dxFormat |= D3DFVF_TEX0;
+			dxFormat |= D3DFVF_TEX1;
 			vertSize += sizeof(float) * 2;
 		}
 		if( fmt & bb::BIT_NRM  ) {

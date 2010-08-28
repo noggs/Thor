@@ -154,7 +154,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 }
 
 
-LPDIRECT3DVERTEXDECLARATION9 vertexDecl = NULL; //VertexDeclaration (NEW)
 LPDIRECT3DVERTEXSHADER9      vertexShader = NULL; //VS (NEW)
 LPD3DXCONSTANTTABLE          constantTable = NULL; //ConstantTable (NEW)
 LPDIRECT3DPIXELSHADER9       pixelShader = NULL; //PS (NEW)
@@ -166,6 +165,7 @@ ID3DXEffect*				pFX_Model = NULL;
 
 LPDIRECT3DTEXTURE9 pGBufferTexture = NULL, pLightBufferTexture = NULL;
 LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pLightBufferSurface = NULL, pBackBuffer = NULL;
+LPDIRECT3DSURFACE9 pZBuffer = NULL;
 
 Thor::Gui* gui = NULL;
 
@@ -205,6 +205,8 @@ void initD3D(HWND hWnd)
 	d3dpp.EnableAutoDepthStencil = TRUE;
 	d3dpp.AutoDepthStencilFormat = D3DFMT_D24S8;//D3DFMT_D16;
 	d3dpp.BackBufferCount = 1;
+	d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
+	d3dpp.MultiSampleQuality = 0;
 
     // create a device class using this information and information from the d3dpp stuct
     result = d3d->CreateDevice(	D3DADAPTER_DEFAULT,
@@ -214,6 +216,8 @@ void initD3D(HWND hWnd)
 								&d3dpp,
 								&d3ddev);
 
+	result = d3ddev->CreateDepthStencilSurface( 800, 600, D3DFMT_D24S8, D3DMULTISAMPLE_NONE, 0, TRUE, &pZBuffer, NULL );
+
 	d3ddev->SetRenderState(D3DRS_AMBIENT,RGB(0,0,0));
 	d3ddev->SetRenderState(D3DRS_LIGHTING, false);
 	d3ddev->SetRenderState(D3DRS_CULLMODE,D3DCULL_CCW);
@@ -222,13 +226,6 @@ void initD3D(HWND hWnd)
 	d3ddev->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
 
 	gui = new Thor::Gui(d3ddev);
-
-	D3DVERTEXELEMENT9 decl[] = {
-		{0,0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,0},
-		{0,12,D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD,0},
-		{0,20,D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL,0},
-		D3DDECL_END()};
-	result = d3ddev->CreateVertexDeclaration(decl, &vertexDecl);
 
 	LPD3DXBUFFER code = NULL; //Temporary buffers
 	LPD3DXBUFFER errors = NULL;
@@ -361,10 +358,10 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
   return d3dTexture;
 }
 
-IDirect3DTexture9* guiTexture = NULL;
+IDirect3DTexture9* duckTexture = NULL;
 
 Thor::Vec4 gDirLightPos(0.7f, 0.0f, -0.7f, 0.0f);
-float gDirLightColour[] = {0.0f, 0.0f, 1.0f};
+float gDirLightColour[] = {0.5f, 0.5f, 0.5f};
 
 struct Light
 {
@@ -374,17 +371,36 @@ struct Light
 };
 
 Light gPointLights[] = {
-	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {1.0f, 0.0f, 0.0f} },
-	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.0f, 1.0f, 0.0f} }
+	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.0f, 0.6f, 0.0f} },
+	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.6f, 0.0f, 0.0f} },
 };
 int gPointLightsNum = 2;
+
+
+
+//////////////////////////////////////////////////////////////////////////
+// Clear lbuffer to white
+// Write out exp(-colour)
+//
+// When reading do -log2(light_buffer)
+// Using blend: 
+//	SrcBlend = DestColor
+//	DestBlend = Zero
+//
+
+//////////////////////////////////////////////////////////////////////////
+// Shadows:
+//	Parallel split?
+//	exponential filtering?
+//
+
 
 // this is the function used to render a single frame
 void render_frame(void)
 {
-	if(guiTexture==NULL)
+	if(duckTexture==NULL)
 	{
-		guiTexture = LoadTexture("test.png");
+		duckTexture = LoadTexture("duckCM.png");
 	}
 
 	// update scene
@@ -424,7 +440,7 @@ void render_frame(void)
 	d3ddev->SetRenderTarget(0, pGBufferSurface);
 	// clear the rt
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL, 
-					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
+					D3DCOLOR_RGBA(0, 0, 0, 0), 1.0f, 0);
 
 	d3ddev->BeginScene();
 
@@ -441,12 +457,8 @@ void render_frame(void)
 	{
 		pFX_GBuffer->BeginPass(iPass);
 
-		d3ddev->SetVertexDeclaration( vertexDecl );
-
 		// Render the mesh with the applied technique
 		gModel->Render();
-
-		d3ddev->SetVertexDeclaration( NULL );
 
 		pFX_GBuffer->EndPass();
 	}
@@ -462,7 +474,7 @@ void render_frame(void)
 	d3ddev->SetRenderTarget(0, pLightBufferSurface);
 	// clear the rt
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
-					D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
+					D3DCOLOR_RGBA(0, 0, 0, 0), 1.0f, 0);
 
 	d3ddev->BeginScene();
 
@@ -492,7 +504,7 @@ void render_frame(void)
 
 	pFX_Lighting->SetFloatArray( "LightColourDif", &gDirLightColour[0], 3 );
 
-#if 0
+#if 1
 	// Apply the technique contained in the effect 
 	pFX_Lighting->Begin(&cPasses, 0);
 
@@ -559,12 +571,17 @@ void render_frame(void)
 
 	// clear the window to a deep blue
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
-					D3DCOLOR_XRGB(0, 40, 100), 1.0f, 0);
+					D3DCOLOR_RGBA(0, 40, 100, 0), 1.0f, 0);
 	d3ddev->BeginScene();    // begins the 3D scene
 
 		pFX_Model->SetMatrix( "WorldViewProj", &matWorldViewProj);
 		pFX_Model->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
+		
+		
 		pFX_Model->SetTexture( "LightBufferTexture", pLightBufferTexture );
+		//pFX_Model->SetTexture( "LightBufferTexture", pGBufferTexture );
+
+		pFX_Model->SetTexture( "DiffuseMap", duckTexture );
 
 		pFX_Model->Begin(&cPasses, 0);
 			pFX_Model->BeginPass(0);
@@ -574,8 +591,8 @@ void render_frame(void)
 			pFX_Model->EndPass();
 		pFX_Model->End();
 
-		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
-		gui->DrawTexturedRect(256, 0, 256, 256, pLightBufferTexture );
+		//gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+		gui->DrawTexturedRect(0, 0, 256, 256, pLightBufferTexture );
 
 		// render 2D overlay
 		gui->Render(d3ddev);
@@ -593,7 +610,3 @@ void cleanD3D(void)
     d3ddev->Release();    // close and release the 3D device
     d3d->Release();    // close and release Direct3D
 }
-
-
-
-
