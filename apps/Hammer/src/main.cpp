@@ -178,7 +178,6 @@ Camera gCamera;
 
 
 Thor::Model* gModel = NULL;
-Thor::Model* gSphere = NULL;
 
 
 Thor::Matrix gWorldMatrices[10];
@@ -266,15 +265,12 @@ void initD3D(HWND hWnd)
 	//gModel->CreateTriangle();
 	gModel->LoadModel( "duck.bbg" );
 
-	gSphere = new Thor::Model();
-	gSphere->LoadModel( "sphere.bbg" );
-
 
 	gCamera.mPosition = Thor::Vec4(0.0f, 100.0f, 300.0f );
 	gCamera.mRotation = 0.0f;
 
 
-	result = D3DXCreateEffectFromFile( d3ddev, L"gbuffer.fx", NULL, NULL, 
+	result = D3DXCreateEffectFromFile( d3ddev, L"fx/gbuffer.fx", NULL, NULL, 
 										0, NULL, &pFX_GBuffer, &errors );
 
 	if(FAILED(result))
@@ -284,7 +280,7 @@ void initD3D(HWND hWnd)
 	}
 
 
-	result = D3DXCreateEffectFromFile( d3ddev, L"lbuffer.fx", NULL, NULL,
+	result = D3DXCreateEffectFromFile( d3ddev, L"fx/lbuffer.fx", NULL, NULL,
 										0, NULL, &pFX_Lighting, &errors );
 	if( FAILED( result ) )
 	{
@@ -293,7 +289,7 @@ void initD3D(HWND hWnd)
 	}
 
 
-	result = D3DXCreateEffectFromFile( d3ddev, L"model.fx", NULL, NULL,
+	result = D3DXCreateEffectFromFile( d3ddev, L"fx/model.fx", NULL, NULL,
 										0, NULL, &pFX_Model, &errors );
 	if( FAILED( result ) )
 	{
@@ -359,6 +355,7 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 }
 
 IDirect3DTexture9* duckTexture = NULL;
+IDirect3DTexture9* duckNrmTexture = NULL;
 
 Thor::Vec4 gDirLightPos(0.7f, 0.0f, -0.7f, 0.0f);
 float gDirLightColour[] = {0.5f, 0.5f, 0.5f};
@@ -371,10 +368,10 @@ struct Light
 };
 
 Light gPointLights[] = {
-	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.0f, 0.6f, 0.0f} },
 	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.6f, 0.0f, 0.0f} },
+	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.0f, 0.6f, 0.0f} },
 };
-int gPointLightsNum = 2;
+int gPointLightsNum = 0;
 
 
 
@@ -388,11 +385,6 @@ int gPointLightsNum = 2;
 //	DestBlend = Zero
 //
 
-//////////////////////////////////////////////////////////////////////////
-// Shadows:
-//	Parallel split?
-//	exponential filtering?
-//
 
 
 // this is the function used to render a single frame
@@ -401,6 +393,10 @@ void render_frame(void)
 	if(duckTexture==NULL)
 	{
 		duckTexture = LoadTexture("duckCM.png");
+	}
+	if(duckNrmTexture==NULL)
+	{
+		duckNrmTexture = LoadTexture("brickwork_nrm.png");
 	}
 
 	// update scene
@@ -448,6 +444,8 @@ void render_frame(void)
 	pFX_GBuffer->SetMatrix( "WorldViewProj", &matWorldViewProj);
 	pFX_GBuffer->SetMatrix( "WorldView", &matWorldView);
 	pFX_GBuffer->SetFloat( "FarClip", gFarClip );
+	pFX_GBuffer->SetTexture( "NormalMap", duckNrmTexture );
+	pFX_GBuffer->CommitChanges();
 
 	// Apply the technique contained in the effect 
 	UINT cPasses, iPass;
@@ -474,6 +472,7 @@ void render_frame(void)
 	d3ddev->SetRenderTarget(0, pLightBufferSurface);
 	// clear the rt
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
+//					D3DCOLOR_RGBA(255, 255, 255, 255), 1.0f, 0);
 					D3DCOLOR_RGBA(0, 0, 0, 0), 1.0f, 0);
 
 	d3ddev->BeginScene();
@@ -582,6 +581,7 @@ void render_frame(void)
 		//pFX_Model->SetTexture( "LightBufferTexture", pGBufferTexture );
 
 		pFX_Model->SetTexture( "DiffuseMap", duckTexture );
+		pFX_Model->CommitChanges();
 
 		pFX_Model->Begin(&cPasses, 0);
 			pFX_Model->BeginPass(0);
@@ -591,8 +591,8 @@ void render_frame(void)
 			pFX_Model->EndPass();
 		pFX_Model->End();
 
-		//gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
-		gui->DrawTexturedRect(0, 0, 256, 256, pLightBufferTexture );
+		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+		gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
 
 		// render 2D overlay
 		gui->Render(d3ddev);

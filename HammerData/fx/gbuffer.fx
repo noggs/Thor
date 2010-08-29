@@ -1,18 +1,33 @@
 
+#include "utility.h"
+
+
 // Global variables
 float4x4 WorldViewProj;		// matrix from ObjectSpace to ClipSpace
 float4x4 WorldView;			// matrix from ObjectSpace to EyeSpace
 
 float FarClip;
 
+// normal map
+texture NormalMap;
+sampler NormalSampler = sampler_state {
+	Texture = <NormalMap>;
+	MipFilter = LINEAR;
+	MinFilter = LINEAR;
+	MagFilter = LINEAR;
+	AddressU = CLAMP;
+	AddressV = CLAMP;
+};
 
 
 // Vertex shader input structure
 struct VS_INPUT
 {
     float4 Position   : POSITION;
-    float2 Texture    : TEXCOORD0;
 	float3 Normal     : NORMAL;
+	float3 Tangent    : TANGENT;
+	float3 Bitangent  : BINORMAL;
+    float2 Texture    : TEXCOORD0;
 };
 
 
@@ -62,50 +77,21 @@ struct PS_OUTPUT
 };
 
 
-float2 F32_Compress(float f)
-{
-	float u,v;
-	float res_u;
-
-	u = floor(f*256.0);
-	res_u = f*256.0 - u;
-	v = floor(res_u * 256.0);
-
-	return (1/256.0*float2(u,v));
-}
-
-float F32_Decompress(float2 vec)
-{
-	return (vec.x+vec.y*1.0/256.0);
-}
-
-float2 PackNormal(float3 nrm)
-{
-	return float2((nrm.x+1.0f)/2.0f, (nrm.y+1.0f)/2.0f);
-}
-
-float3 UnpackNormal(float2 nrm)
-{
-	float x = (nrm.x*2.0f)-1.0f;
-	float y = (nrm.y*2.0f)-1.0f;
-	return float3( x, y, sqrt(1-(x*x)-(y*y)) );
-}
-
-
 PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
     
     float depth = In.Depth.x / In.Depth.y;	// z / w
+    
+    float3 normal = In.Normal;
+    
+    // perturb normal based on normal map
+    float4 nrmMap = tex2D( NormalSampler, In.Texture );
+    
+    //normal = nrmMap;
 
-	//Out.Color = float4(In.Normal, 1.0f);
-	//Out.Color = float4(In.Depth, In.Depth, In.Depth, 1.0f);
-	
-	// pack normal into the first 16 bits and depth into next two
-	//Out.Color = float4(In.Normal.x, In.Normal.y, 0.0f, 0.0f);
-	//Out.Color = float4(F32_Compress(In.Depth), 0.0f, 1.0f );
-	
-	Out.Color = float4( PackNormal(In.Normal.xyz), F32_Compress(depth) );
+	// pack normal and depth	
+	Out.Color = float4( PackNormal(normal), F32_Compress(depth) );
 	
 	// test unpacking the depth
 	//float unpacked = F32_Decompress(Out.Color.zw);

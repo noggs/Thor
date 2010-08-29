@@ -1,4 +1,6 @@
 
+#include "utility.h"
+
 float4x4	WorldViewProj;		// matrix from ObjectSpace to ClipSpace
 float2		GBufferSize;		// dimensions of GBuffer texture
 
@@ -90,22 +92,24 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
     //Out.Color = float4( uv, 0.0f, 1.0f );
 
     // grab value from the Lighting Buffer (diffuse xyz, specular w)
-    float4 lighting = tex2D( LightBufferSampler, uv );
+    float4 lighting = MapInvExp( tex2D( LightBufferSampler, uv ) );
     
 	float3 diffCol = float3( lighting.xyz );
 	
-	float SpecularPower_0 = 10.0f;
-	float specular = pow( lighting.w * 3.5, SpecularPower_0);
+	float SpecularPower_0 = 5.0f;
+	float specular = pow( lighting.w, SpecularPower_0);
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
 
-	
+	float specIntens = 0.2f;
+	float diffIntens = 1.0f;
 	
 	// get diffuse colour here
 	float4 baseCol = float4( tex2D(DiffuseSampler, In.Texture) );
-	Out.Color = float4( baseCol.xyz * diffCol + specular, 1.0f );
 	
-	// Final output = baseColour * diffLighting * diffIntens + specular * specIntensity
+	//Out.Color = baseCol;
+	
+	Out.Color = float4( baseCol.xyz * diffCol * diffIntens + specular * specIntens, 1.0f );
 
     return Out;                                //return output pixel
 }

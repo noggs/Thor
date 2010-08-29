@@ -1,4 +1,6 @@
 
+#include "utility.h"
+
 // Global variables
 float4x4	WorldViewProj;		// matrix from ObjectSpace to ClipSpace
 float4x4	WorldView;			// matrix from ObjectSpace to EyeSpace
@@ -87,36 +89,6 @@ struct PS_OUTPUT
 };
 
 
-float2 F32_Compress(float f)
-{
-	float u,v;
-	float res_u;
-
-	u = floor(f*256.0);
-	res_u = f*256.0 - u;
-	v = floor(res_u * 256.0);
-
-	return (1/256.0*float2(u,v));
-}
-
-float F32_Decompress(float2 vec)
-{
-	return (vec.x+vec.y*1.0/256.0);
-}
-
-float2 PackNormal(float3 nrm)
-{
-	return float2((nrm.x+1.0f)/2.0f, (nrm.y+1.0f)/2.0f);
-}
-
-float3 UnpackNormal(float2 nrm)
-{
-	float x = (nrm.x*2.0f)-1.0f;
-	float y = (nrm.y*2.0f)-1.0f;
-	return float3( x, y, sqrt(1-(x*x)-(y*y)) );
-}
-
-
 
 PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
 {
@@ -142,7 +114,7 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
 	
 	// now calculate specular component
 	float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
-	float specular = saturate( dot( reflect(eyeVec, nrm), LightDirVS)) / 10;
+	float specular = pow( saturate( dot( reflect(eyeVec, nrm), LightDirVS)), 10);
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
     
@@ -153,6 +125,8 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
 	//Out.Color += float4( specular, specular, specular, 0.0f );
 	
 	//Out.Color = float4( specular, specular, specular, specular );
+	
+	Out.Color = MapExp( Out.Color );
     
     return Out;
 }
@@ -204,7 +178,7 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
 
 	// now calculate specular component
 	float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
-	float specular = saturate( dot( reflect(eyeVec, nrm), LightDirVS)) / 10;
+	float specular = pow( saturate( dot( reflect(eyeVec, nrm), lightDir)), 10);
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
 	
@@ -215,6 +189,9 @@ PS_OUTPUT ps_light( in VS_OUTPUT In )
 	//Out.Color += float4( specular, specular, specular, 0.0f );
 
 	//Out.Color = float4( specular, specular, specular, specular );
+
+	Out.Color = MapExp( Out.Color );
+
 
     return Out;                                //return output pixel
 }
@@ -254,6 +231,8 @@ Technique PointLight
 		BlendOp				= ADD;
 		SrcBlend			= ONE;
 		DestBlend			= ONE;
+		//SrcBlend = DestColor;
+		//DestBlend = Zero;
 
 		VertexShader = compile vs_2_0 vs_light();
 		PixelShader  = compile ps_2_0 ps_light();

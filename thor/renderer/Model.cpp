@@ -8,11 +8,6 @@
 using namespace Thor;
 
 
-struct D3DVERTEX
-{
-   Vec4 vec;
-   DWORD color;
-};
 
 namespace bb 
 {
@@ -20,31 +15,13 @@ namespace bb
 	{
 		BIT_UV1			= 0x1,
 		BIT_NRM			= 0x2,
+		BIT_TAN			= 0x4,
 	};
 }
 
 
 #define LENGTH_OF(a) ( sizeof( a ) / sizeof( a[0] ) )
 
-D3DVERTEX gVerticesTriangle[] = {
-	{Vec4(0.0f, 0.0f, 0.0f, 1.0f), 0xff00ff00},
-	{Vec4(1.0f, 0.0f, 0.0f, 1.0f), 0xff0000ff},
-	{Vec4(1.0f, 1.0f, 0.0f, 1.0f), 0xffff0000}
-};
-
-D3DVERTEX gVerticesCube[] = {
-	{Vec4(-0.5f, -0.5f, -0.5f, 1.0f),	0xffffffff},
-	{Vec4( 0.5f, -0.5f, -0.5f, 1.0f),	0xffffffff},
-	{Vec4(-0.5f,  0.5f, -0.5f, 1.0f),	0xffffffff},
-	{Vec4( 0.5f,  0.5f, -0.5f, 1.0f),	0xffffffff},
-	{Vec4(-0.5f, -0.5f,  0.5f, 1.0f),	0xffffffff},
-	{Vec4( 0.5f, -0.5f,  0.5f, 1.0f),	0xffffffff},
-	{Vec4(-0.5f,  0.5f,  0.5f, 1.0f),	0xffffffff},
-	{Vec4( 0.5f,  0.5f,  0.5f, 1.0f),	0xffffffff}
-};
-
-
-D3DMATERIAL9 ObjectMaterial; //material object (NEW)
 
 
 extern LPDIRECT3DDEVICE9 d3ddev;    // the pointer to the device class
@@ -56,32 +33,20 @@ extern Matrix gLocalMatrices[];
 extern int gNumLocalMatrices;
 
 
-void Model::CreateTriangle()
+void CreateVertexDeclaration(int fmt, Thor::VertexDecl** declOut )
 {
-	mName.assign("Triangle");
-	VertexBuffer* pVertexBuffer;
-	d3ddev->CreateVertexBuffer(3*sizeof(D3DVERTEX), 0, D3DFVF_XYZ|D3DFVF_DIFFUSE, 
-		D3DPOOL_DEFAULT, &pVertexBuffer, NULL);
+	D3DVERTEXELEMENT9 decl[] = {
+		{0, 0,  D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		{0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL,   0},
+		{0, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT,  0},
+		{0, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL, 0},
+		{0, 48, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		D3DDECL_END() };
 
-	void* buffer;
-	pVertexBuffer->Lock(0, 3*sizeof(D3DVERTEX), &buffer, 0);
-	memcpy(buffer, gVerticesTriangle, 3*sizeof(D3DVERTEX));
-	pVertexBuffer->Unlock();
-
-	mGeometry = new Geometry();
-	mGeometry->mVertexSize = sizeof(D3DVERTEX);
-	mGeometry->mVertexFormat = D3DFVF_XYZ|D3DFVF_DIFFUSE;
-	mGeometry->mVertexBuffer = pVertexBuffer;
-	mGeometry->mNumVertices = 3;
-	mGeometry->mIndexBuffer = NULL;
-	mGeometry->mNumIndices = 0;
-
-	mWorldTransformID = gNumWorldMatrices++;
-	D3DXMatrixIdentity( &gWorldMatrices[mWorldTransformID] );
-
-	mLocalTransformID = gNumLocalMatrices++;
-	D3DXMatrixIdentity( &gLocalMatrices[mLocalTransformID] );
+	d3ddev->CreateVertexDeclaration(decl, declOut);
 }
+
+
 
 
 void Model::LoadModel(const char* filename)
@@ -119,6 +84,11 @@ void Model::LoadModel(const char* filename)
 			dxFormat |= D3DFVF_NORMAL;
 			vertSize += sizeof(float) * 3;
 		}
+		if( fmt & bb::BIT_TAN ) {
+			// no dx thingy for a TANGENT+BITANGENT
+			vertSize += sizeof(float) * 6;
+		}
+
 
 		// create vertex buffer
 		VertexBuffer* pVertexBuffer;
@@ -152,13 +122,17 @@ void Model::LoadModel(const char* filename)
 			in.read( reinterpret_cast<char*>( buffer ), numFaces * 3 * sizeof(short) );
 		ret = pIndexBuffer->Unlock();
 
+		// create vertex declaration
+
 		mGeometry = new Geometry();
 		mGeometry->mVertexSize = vertSize;
-		mGeometry->mVertexFormat = dxFormat;
+		mGeometry->mVertexFormat = fmt;
+		mGeometry->mVertexFormatDX = dxFormat;
 		mGeometry->mVertexBuffer = pVertexBuffer;
 		mGeometry->mNumVertices = numVerts;
 		mGeometry->mIndexBuffer = pIndexBuffer;
 		mGeometry->mNumIndices = numFaces;
+		CreateVertexDeclaration( fmt, &mGeometry->mVertexDecl );
 
 		mWorldTransformID = gNumWorldMatrices++;
 		D3DXMatrixIdentity( &gWorldMatrices[mWorldTransformID] );
@@ -169,10 +143,6 @@ void Model::LoadModel(const char* filename)
 
 	in.close();
 
-	ZeroMemory(&ObjectMaterial,sizeof(ObjectMaterial));
-	ObjectMaterial.Diffuse.r = 1.0f;
-	ObjectMaterial.Diffuse.g = 1.0f;
-	ObjectMaterial.Diffuse.b = 1.0f;
 }
 
 
@@ -185,11 +155,11 @@ void Model::Render()
 
 	// render the model
 	d3ddev->SetStreamSource(0, mGeometry->mVertexBuffer, 0, mGeometry->mVertexSize);
-	d3ddev->SetFVF( mGeometry->mVertexFormat );
+	d3ddev->SetFVF( mGeometry->mVertexFormatDX );
 
 	if( mGeometry->mIndexBuffer ) {
 
-		d3ddev->SetMaterial(&ObjectMaterial);
+		ret = d3ddev->SetVertexDeclaration( mGeometry->mVertexDecl );
 
 		ret = d3ddev->SetIndices( mGeometry->mIndexBuffer );
 		ret = d3ddev->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 

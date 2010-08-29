@@ -12,6 +12,7 @@ namespace bb
 	{
 		BIT_UV1			= 0x1,
 		BIT_NRM			= 0x2,
+		BIT_TAN			= 0x4,
 	};
 
 }
@@ -44,6 +45,8 @@ void DoTheSceneProcessing( const aiScene* scene )
 				fmt |= bb::BIT_UV1;
 			if( mesh->HasNormals() )
 				fmt |= bb::BIT_NRM;
+			if( mesh->HasTangentsAndBitangents() )
+				fmt |= bb::BIT_TAN;
 
 			// write the format def
 			out.write( (char*)&fmt, sizeof(int) );
@@ -62,10 +65,17 @@ void DoTheSceneProcessing( const aiScene* scene )
 					out.write( (char*)&mesh->mNormals[iVert], sizeof(float) * 3 );
 				}
 
+				// tangent
+				if( fmt & bb::BIT_TAN ) {
+					out.write( (char*)&mesh->mTangents[iVert], sizeof(float) * 3 );
+					out.write( (char*)&mesh->mBitangents[iVert], sizeof(float) * 3 );
+				}
+
 				// tex coords (1)
 				if( fmt & bb::BIT_UV1 )	{
 					out.write( (char*)&mesh->mTextureCoords[0][iVert], sizeof(float) * 2 );
 				}
+
 			}
 
 			// now write the face information

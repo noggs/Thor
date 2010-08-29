@@ -11,16 +11,19 @@ namespace Thor {
 	// for now!
 	typedef IDirect3DVertexBuffer9 VertexBuffer;
 	typedef IDirect3DIndexBuffer9 IndexBuffer;
+	typedef IDirect3DVertexDeclaration9 VertexDecl; 
 
 	struct Geometry
 	{
-		VertexBuffer* mVertexBuffer;
-		int mVertexSize;
-		int mVertexFormat;
-		int mNumVertices;
+		VertexBuffer*	mVertexBuffer;
+		VertexDecl*		mVertexDecl;
+		int 			mVertexSize;
+		int 			mVertexFormat;		// internal
+		int 			mVertexFormatDX;	// DX9 format
+		int 			mNumVertices;
 
-		IndexBuffer* mIndexBuffer;
-		int mNumIndices;
+		IndexBuffer*	mIndexBuffer;
+		int				mNumIndices;
 	};
 
 
@@ -28,8 +31,6 @@ namespace Thor {
 	class Model
 	{
 	public:
-		void CreateTriangle();
-		void CreateBox();
 		void LoadModel( const char* filename );
 
 		void Render();

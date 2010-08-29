@@ -7,11 +7,12 @@ Light pre-pass renderer
 [DONE] 2b. For debug decode normal and depth and draw to seperate screen areas
 
 [DONE] 3. Create Light buffer containing 32 bits of something
-4. For each light render the info into the buffer
+[DONE] 4. For each light render the info into the buffer
 [DONE] 4a. Implement directional and ambient 
-4b. Implement point light
+[DONE] 4b. Implement point light
 4bI. Divide screen into tiles
-5. Switch to forward render and look-up into light buffer for lighting information
+[DONE] 5. Switch to forward render and look-up into light buffer for lighting information
+6. Use linear depth instead of /w depth
 
 
 Divide screen into tiles
@@ -46,6 +47,8 @@ Texture loader / library
 Camera class
 Scene class
 
+Physics engine integration
+Scene editor integration
 
 
 Components
