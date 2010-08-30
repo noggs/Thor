@@ -302,8 +302,8 @@ void initD3D(HWND hWnd)
 	gPlane->LoadModel( "plane_xz_200.bbg" );
 
 
-	gCamera.mPosition = Thor::Vec4(0.0f, 0.0f, -3.0f );
-	gCamera.mRotationX = 0.0f;
+	gCamera.mPosition = Thor::Vec4(0.0f, 4.0f, -3.0f );
+	gCamera.mRotationX = 0.77f;
 	gCamera.mRotationY = 0.0f;
 
 
@@ -350,7 +350,7 @@ void SetupCamera(void)
   
 	// set the view matrix
 	D3DXVECTOR3 EyePoint(gCamera.mPosition.GetX(),gCamera.mPosition.GetY(),gCamera.mPosition.GetZ());
-	D3DXVECTOR3 LookAt(0.0f, 0.0f, 0.0f);
+	D3DXVECTOR3 LookAt(gCamera.mPosition.GetX(), gCamera.mPosition.GetY(), 0.0f);
 	D3DXVECTOR3 UpVector(0.0f, 1.0f, 0.0f);
 	D3DXMatrixLookAtLH(&ViewMatrix, &EyePoint, &LookAt, &UpVector);
 
@@ -382,38 +382,51 @@ void FlyCam(float frameTime)
 	if(keys[39])
 		angleY += rotSpeed * frameTime;
 	if(keys[38])
-		angleX += rotSpeed * frameTime;
-	if(keys[40])
 		angleX -= rotSpeed * frameTime;
+	if(keys[40])
+		angleX += rotSpeed * frameTime;
 
 	gCamera.mRotationX += angleX;
 	gCamera.mRotationY += angleY;
 
 
+	D3DXVECTOR3 right	(1.0f, 0.0f, 0.0f);
+	D3DXVECTOR3 up		(0.0f, 1.0f, 0.0f);
+	D3DXVECTOR3 forward	(0.0f, 0.0f, 1.0f);
 
 	// create matrix which maps from world space to view space
-	D3DXMATRIX mat;
 
+	// YAW
 	D3DXMATRIX matYaw;
 	D3DXMatrixRotationY( &matYaw, gCamera.mRotationY );
+	D3DXVec3TransformCoord( &forward, &forward, &matYaw );
+	D3DXVec3TransformCoord( &right, &right, &matYaw );
 
+	// PITCH
 	D3DXMATRIX matPitch;
-	D3DXMatrixRotationX( &matPitch, gCamera.mRotationX );
+	D3DXMatrixRotationAxis( &matPitch, &right, gCamera.mRotationX );
+	D3DXVec3TransformCoord( &forward, &forward, &matPitch );
+	D3DXVec3TransformCoord( &up, &up, &matPitch );
 
-	mat = matYaw * matPitch;
+	// create matrix
+	D3DXMATRIX mat;
+	D3DXMatrixIdentity(&mat);
+	mat._11 = right.x;		mat._12 = up.x;		mat._13 = forward.x;
+	mat._21 = right.y;		mat._22 = up.y;		mat._23 = forward.y;
+	mat._31 = right.z;		mat._32 = up.z;		mat._33 = forward.z;
 
+	// transform movement vector
+	D3DXVECTOR3 rightM = right * movement.GetX();
+	D3DXVECTOR3 forwardM = forward * movement.GetZ();
+	gCamera.mPosition += Thor::Vec4( rightM.x, rightM.y, rightM.z, 0.0f );
+	gCamera.mPosition += Thor::Vec4( forwardM.x, forwardM.y, forwardM.z, 0.0f );
 
-	// transform
-	D3DXVECTOR4 moveVS( movement.GetX(), movement.GetY(), movement.GetZ(), 1.0f );
-	D3DXVec4Transform( &moveVS, &moveVS, &mat );
-	movement.SetX( moveVS.x ); movement.SetY( moveVS.y ); movement.SetZ( moveVS.z );
-
-	gCamera.mPosition += movement;
+	D3DXVECTOR3 position = D3DXVECTOR3(gCamera.mPosition.GetX(), gCamera.mPosition.GetY(), gCamera.mPosition.GetZ());
 
 	// inverse translation
-	mat._41 = -gCamera.mPosition.GetX();
-	mat._42 = -gCamera.mPosition.GetY();
-	mat._43 = -gCamera.mPosition.GetZ();
+	mat._41 = - D3DXVec3Dot( &position, &right );
+	mat._42 = - D3DXVec3Dot( &position, &up );
+	mat._43 = - D3DXVec3Dot( &position, &forward );
 
 	gCamera.mMatrix = mat;
 }
@@ -500,8 +513,8 @@ void render_frame(void)
 	}
 
 	// update scene
-	gModel->Update();
-	gPlane->Update();
+	//gModel->Update();
+	//gPlane->Update();
 
 	// update camera
 

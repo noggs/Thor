@@ -45,7 +45,7 @@ struct VS_OUTPUT
 {
     float4 Position   : POSITION;
     float2 Texture    : TEXCOORD0;
-    float2 LookupUV   : TEXCOORD1;		// lookup into Lighting buffer
+    float3 LookupUV   : TEXCOORD1;		// lookup into Lighting buffer
 };
 
 
@@ -60,8 +60,10 @@ VS_OUTPUT vs_main( in VS_INPUT In )
 
     Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
 
-	Out.LookupUV.x = Out.Position.x / Out.Position.w;
-	Out.LookupUV.y = Out.Position.y / Out.Position.w;
+	// need to do divide per pixel to avoid distortion
+	Out.LookupUV.x = Out.Position.x;
+	Out.LookupUV.y = -Out.Position.y;
+	Out.LookupUV.z = Out.Position.w;
 
     Out.Texture  = float2(In.Texture.x, 1-In.Texture.y);          //invert Y for some reason?
 
@@ -83,15 +85,11 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
 {
     PS_OUTPUT Out;                             //create an output pixel
     
-    float2 uv = float2(
-		(0.5f * In.LookupUV.x) + 0.5f,
-		(0.5f * -In.LookupUV.y) + 0.5f);
-		
-	uv += 0.5f / GBufferSize;
+    float2 uv = (0.5f * (In.LookupUV.xy / In.LookupUV.z)) + 0.5f + (0.5f / GBufferSize);
 
     //Out.Color = float4( uv, 0.0f, 1.0f );
     //return Out;
-
+    
     // grab value from the Lighting Buffer (diffuse xyz, specular w)
     float4 lighting = MapInvExp( tex2D( LightBufferSampler, uv ) );
     
@@ -109,6 +107,7 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
 	float4 baseCol = float4( tex2D(DiffuseSampler, In.Texture) );
 	
 	//Out.Color = baseCol;
+	//return Out;
 	
 	Out.Color = float4( baseCol.xyz * diffCol * diffIntens + specular * specIntens, 1.0f );
 
