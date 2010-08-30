@@ -190,7 +190,6 @@ PS_OUTPUT ps_light( uniform const int NumLights, in VS_OUTPUT In )
 
 	float3 pixelPosVS = float3( projPixelPos.xyz / projPixelPos.w ); 	
 	
-	//const int NumLightss = 2;
 	for( int i = 0; i != NumLights; ++i )
 	{
 		// calculate distance and direction to light
@@ -208,7 +207,7 @@ PS_OUTPUT ps_light( uniform const int NumLights, in VS_OUTPUT In )
 
 		// now calculate specular component
 		float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
-		float specular = saturate( dot( reflect(eyeVec, nrm), lightDir)) / 10;
+		float specular = saturate( dot( reflect(eyeVec, nrm), lightDir)) * 0.1f;
 		
 		//Out.Color = float4( specular, specular, specular, 1.0f );
 		
@@ -244,6 +243,12 @@ Technique DirectionalLight
 	}
 }
 
+int CurNumLights = 2;
+PixelShader psArray[] = {	compile ps_2_0 ps_light(1), 
+                            compile ps_2_0 ps_light(2),
+                            compile ps_2_0 ps_light(3),
+						};
+
 
 Technique PointLight
 {
@@ -262,7 +267,7 @@ Technique PointLight
 		DestBlend			= ONE;
 
 		VertexShader = compile vs_2_0 vs_light();
-		PixelShader  = compile ps_2_0 ps_light(2);
+		PixelShader  = (psArray[CurNumLights]);
 	}
 }
 

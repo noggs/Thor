@@ -371,8 +371,9 @@ struct Light
 };
 
 Light gPointLights[] = {
-	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.6f, 0.0f, 0.0f} },
-	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.0f, 0.6f, 0.0f} },
+	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 500.0f, {0.0f, 0.6f, 0.0f} },
+	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 500.0f, {0.6f, 0.0f, 0.0f} },
+	{ Thor::Vec4(0.0f, -100.0f, 0.0f, 1.0f), 500.0f, {1.0f, 1.0f, 1.0f} },
 };
 int gPointLightsNum = 2;
 
@@ -556,6 +557,7 @@ void render_frame(void)
 		pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
 		pFX_Lighting->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
 		pFX_Lighting->SetFloatArray( "LightRadius", &lightRadius[0], i );
+		pFX_Lighting->SetInt( "CurNumLights", gPointLightsNum-1 );
 		pFX_Lighting->CommitChanges();
 	}
 
