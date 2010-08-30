@@ -368,10 +368,11 @@ struct Light
 };
 
 Light gPointLights[] = {
-	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.6f, 0.0f, 0.0f} },
-	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 250.0f, {0.0f, 0.6f, 0.0f} },
+	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 500.0f, {0.6f, 0.0f, 0.0f} },
+	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 500.0f, {0.0f, 0.6f, 0.0f} },
+	{ Thor::Vec4(0.0f, -100.0f, 0.0f, 1.0f), 500.0f, {1.0f, 1.0f, 1.0f} },
 };
-int gPointLightsNum = 0;
+int gPointLightsNum = 1;
 
 
 
@@ -526,6 +527,40 @@ void render_frame(void)
 	//////////////////////////////////////////////////////////////////////////
 	// Now render all the point lights
 
+	// Setup lighting parameters
+	{
+		const int MaxLights = 8;
+		D3DXVECTOR3 lightPos[MaxLights];
+		float lightColour[3*MaxLights];
+		float lightRadius[MaxLights];
+
+		int i;
+		for(i=0; i<gPointLightsNum && i<MaxLights; ++i)
+		{
+			const Light& light = gPointLights[i];
+
+			// transform pos into view space
+			D3DXVECTOR4 tempPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), 1.0f );
+			D3DXVECTOR4 xformPos;
+			D3DXVec4Transform( &xformPos, &tempPos, &matView );
+
+			lightPos[i] = D3DXVECTOR3(xformPos.x, xformPos.y, xformPos.z);
+
+			lightColour[0 + (i*3)] = light.colour[0];
+			lightColour[1 + (i*3)] = light.colour[1];
+			lightColour[2 + (i*3)] = light.colour[2];
+
+			lightRadius[i] = light.radius;
+		}
+
+		pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
+		pFX_Lighting->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
+		pFX_Lighting->SetFloatArray( "LightRadius", &lightRadius[0], i );
+		pFX_Lighting->SetInt( "CurNumLights", gPointLightsNum-1 );
+		pFX_Lighting->CommitChanges();
+	}
+
+
 	pFX_Lighting->SetTechnique("PointLight");
 
 	d3ddev->BeginScene();
@@ -537,23 +572,23 @@ void render_frame(void)
 		pFX_Lighting->BeginPass(iPass);
 
 		// for each positional light...
-		for(int i=0; i<gPointLightsNum; ++i)
-		{
-			const Light& light = gPointLights[i];
+		//for(int i=0; i<gPointLightsNum; ++i)
+		//{
+		//	const Light& light = gPointLights[i];
 
 			// position in ViewSpace
-			D3DXVECTOR4 lightPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), light.pos.GetW() );
-			D3DXVec4Transform( &lightPos, &lightPos, &matView );
-			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 3 );
-			pFX_Lighting->SetFloatArray( "LightColourDif", &light.colour[0], 3 );
-			pFX_Lighting->SetFloat( "LightRadius", light.radius );
+			//D3DXVECTOR4 lightPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), light.pos.GetW() );
+			//D3DXVec4Transform( &lightPos, &lightPos, &matView );
+			//pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 3 );
+			//pFX_Lighting->SetFloatArray( "LightColourDif", &light.colour[0], 3 );
+			//pFX_Lighting->SetFloatArray( "LightRadius", &light.radius,1 );
 
-			pFX_Lighting->CommitChanges();
+			//pFX_Lighting->CommitChanges();
 
 			// Render a full screen quad for the light - room for improvement here :)
 			gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
 			gui->Render(d3ddev);
-		}
+		//}
 
 		pFX_Lighting->EndPass();
 	}
