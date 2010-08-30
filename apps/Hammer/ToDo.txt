@@ -14,6 +14,8 @@ Light pre-pass renderer
 [DONE] 5. Switch to forward render and look-up into light buffer for lighting information
 6. Use linear depth instead of /w depth
 
+FREE CAM WHEN CLICKED!
+
 
 Divide screen into tiles
 Transform light volumes into screenspace

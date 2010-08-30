@@ -262,11 +262,11 @@ void initD3D(HWND hWnd)
 
 
 	gModel = new Thor::Model();
-	//gModel->CreateTriangle();
 	gModel->LoadModel( "duck.bbg" );
+	//gModel->LoadModel( "plane_xz_200.bbg" );
 
 
-	gCamera.mPosition = Thor::Vec4(0.0f, 100.0f, 300.0f );
+	gCamera.mPosition = Thor::Vec4(0.0f, 2.0f, 3.0f );
 	gCamera.mRotation = 0.0f;
 
 
@@ -300,8 +300,8 @@ void initD3D(HWND hWnd)
 }
 
 
-float gNearClip = 100.0f;
-float gFarClip = 900.0f;
+float gNearClip = 2.0f;
+float gFarClip = 100.0f;
 
 void SetupCamera(void)
 {
@@ -313,7 +313,7 @@ void SetupCamera(void)
   
 	// set the view matrix
 	D3DXVECTOR3 EyePoint(gCamera.mPosition.GetX(),gCamera.mPosition.GetY(),gCamera.mPosition.GetZ());
-	D3DXVECTOR3 LookAt(0.0f, 70.0f, 0.0f);
+	D3DXVECTOR3 LookAt(0.0f, 1.0f, 0.0f);
 	D3DXVECTOR3 UpVector(0.0f, 1.0f, 0.0f);
 	D3DXMatrixLookAtLH(&ViewMatrix, &EyePoint, &LookAt, &UpVector);
 
@@ -368,11 +368,11 @@ struct Light
 };
 
 Light gPointLights[] = {
-	{ Thor::Vec4(100.0f, 100.0f, 0.0f, 1.0f), 500.0f, {0.6f, 0.0f, 0.0f} },
-	{ Thor::Vec4(-100.0f, 100.0f, 0.0f, 1.0f), 500.0f, {0.0f, 0.6f, 0.0f} },
-	{ Thor::Vec4(0.0f, -100.0f, 0.0f, 1.0f), 500.0f, {1.0f, 1.0f, 1.0f} },
+	{ Thor::Vec4(1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.6f, 0.0f, 0.0f} },
+	{ Thor::Vec4(-1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.0f, 0.6f, 0.0f} },
+	{ Thor::Vec4(0.0f, -1.0f, 0.0f, 1.0f), 5.0f, {1.0f, 1.0f, 1.0f} },
 };
-int gPointLightsNum = 1;
+int gPointLightsNum = 2;
 
 
 

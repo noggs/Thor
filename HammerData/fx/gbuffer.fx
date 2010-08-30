@@ -36,8 +36,10 @@ struct VS_OUTPUT
 {
     float4 Position   : POSITION;
     float2 Texture    : TEXCOORD0;
-    float3 Normal     : TEXCOORD1;
-    float2 Depth      : TEXCOORD2;
+    float3 NormalX    : TEXCOORD1;
+    float3 NormalY    : TEXCOORD2;
+    float3 NormalZ    : TEXCOORD3;
+    float2 Depth      : TEXCOORD4;
 };
 
 
@@ -51,10 +53,14 @@ VS_OUTPUT vs_main( in VS_INPUT In )
     VS_OUTPUT Out;                      //create an output vertex
 
     Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
-
     Out.Texture  = In.Texture;          //copy original texcoords
+    
+    //Out.Normal = mul(In.Normal, WorldViewProj); // transform Normal
 
-    Out.Normal = -normalize(mul(In.Normal, WorldViewProj)); // transform Normal and normalize
+	// create matrix mapping from tangent-space to view-space to transform the bump map
+	Out.NormalX = -mul( In.Tangent, WorldViewProj );
+	Out.NormalY = -mul( In.Normal, WorldViewProj );
+	Out.NormalZ = -mul( In.Bitangent, WorldViewProj );	
 
 	// non-linear depth
 	//Out.Depth = (Out.Position.z/Out.Position.w); 
@@ -83,12 +89,17 @@ PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
     
     float depth = In.Depth.x / In.Depth.y;	// z / w
     
-    float3 normal = In.Normal;
+    //float3 normal = -normalize( In.Normal );
     
     // perturb normal based on normal map
     float4 nrmMap = tex2D( NormalSampler, In.Texture );
     
-    //normal = nrmMap;
+    // transform bump from tangent space to viewspace
+    float3x3 nrmMat = float3x3( normalize(In.NormalX), normalize(In.NormalY), normalize(In.NormalZ) );
+    float3 normal = float3(0.0f, 1.0f, 0.0f);
+    
+    normal = mul( normal, nrmMat );
+    
 
 	// pack normal and depth	
 	Out.Color = float4( PackNormal(normal), F32_Compress(depth) );

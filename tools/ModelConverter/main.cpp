@@ -118,6 +118,7 @@ bool DoTheImportThing( const std::string& pFile)
   // If the import failed, report it
   if( !scene)
   {
+	  const char* error = importer.GetErrorString();
     //DoTheErrorLogging( importer.GetErrorString());
     return false;
   }

@@ -90,6 +90,7 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
 	uv += 0.5f / GBufferSize;
 
     //Out.Color = float4( uv, 0.0f, 1.0f );
+    //return Out;
 
     // grab value from the Lighting Buffer (diffuse xyz, specular w)
     float4 lighting = MapInvExp( tex2D( LightBufferSampler, uv ) );
