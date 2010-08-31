@@ -10,6 +10,7 @@ struct IDirect3DTexture9;
 
 namespace Thor
 {
+	typedef IDirect3DVertexDeclaration9 VertexDecl; 
 
 	class Gui
 	{
@@ -23,6 +24,7 @@ namespace Thor
 
 	private:
 
+		Thor::VertexDecl*	mVertexDecl;
 		Thor::VertexBuffer*	mVertexBuffer;
 		int					mMaxVerts;
 		int					mNumVerts;

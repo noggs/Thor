@@ -4,11 +4,10 @@
 
 using namespace Thor;
 
+
 Gui::Gui(IDirect3DDevice9* d3ddev)
 {
 	HRESULT ret;
-
-	unsigned int dxFormat = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
 	int vertSize = sizeof(GuiVertex);
 
 	mNumVerts = 0;
@@ -17,8 +16,16 @@ Gui::Gui(IDirect3DDevice9* d3ddev)
 	mMaxVerts = 1024;
 
 	// create vertex buffer
-	ret = d3ddev->CreateVertexBuffer(mMaxVerts * vertSize, D3DUSAGE_DYNAMIC|D3DUSAGE_WRITEONLY, dxFormat, 
+	ret = d3ddev->CreateVertexBuffer(mMaxVerts * vertSize, D3DUSAGE_DYNAMIC|D3DUSAGE_WRITEONLY, 0, 
 									 D3DPOOL_DEFAULT, &mVertexBuffer, NULL);
+
+	D3DVERTEXELEMENT9 decl[] = {
+		{0, 0,  D3DDECLTYPE_FLOAT4,   D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITIONT, 0},
+		{0, 16, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR,    0},
+		{0, 20, D3DDECLTYPE_FLOAT2,   D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		D3DDECL_END() };
+
+	ret = d3ddev->CreateVertexDeclaration(decl, &mVertexDecl);
 }
 
 
@@ -67,9 +74,8 @@ void Gui::Render(IDirect3DDevice9 *d3ddev)
 	if( mNumCommands > 0 )
 	{
 		// setup vertex stream
-		unsigned int dxFormat = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
 		res = d3ddev->SetStreamSource(0, mVertexBuffer, 0, sizeof(GuiVertex));
-		res = d3ddev->SetFVF( dxFormat );
+		res = d3ddev->SetVertexDeclaration( mVertexDecl );
 
 		int vert = 0;
 
