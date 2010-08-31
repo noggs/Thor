@@ -137,6 +137,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
     return msg.wParam;
 }
 
+bool keys[256] = { false };
 
 // this is the main message handler for the program
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -148,7 +149,36 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                 PostQuitMessage(0);
                 return 0;
             } break;
-    }
+
+
+
+		case WM_LBUTTONDOWN:
+			{
+				SetCapture(hWnd);
+			} break;
+
+		case WM_LBUTTONUP:
+			{
+				ReleaseCapture();
+			} break;
+
+		case WM_MOUSEMOVE:
+			{
+			} break;
+
+
+
+		case WM_KEYDOWN:
+			{
+				keys[ wParam ] = true;
+			} break;
+
+		case WM_KEYUP:
+			{
+				keys[ wParam ] = false;
+			} break;
+
+	}
 
     return DefWindowProc (hWnd, message, wParam, lParam);
 }
@@ -172,12 +202,16 @@ Thor::Gui* gui = NULL;
 struct Camera
 {
 	Thor::Vec4	mPosition;
-	float		mRotation;
+	float		mRotationX;
+	float		mRotationY;
+
+	Thor::Matrix	mMatrix;
 };
 Camera gCamera;
 
 
 Thor::Model* gModel = NULL;
+Thor::Model* gPlane = NULL;
 
 
 Thor::Matrix gWorldMatrices[10];
@@ -263,11 +297,14 @@ void initD3D(HWND hWnd)
 
 	gModel = new Thor::Model();
 	gModel->LoadModel( "duck.bbg" );
-	//gModel->LoadModel( "plane_xz_200.bbg" );
+
+	gPlane = new Thor::Model();
+	gPlane->LoadModel( "plane_xz_200.bbg" );
 
 
-	gCamera.mPosition = Thor::Vec4(0.0f, 2.0f, 3.0f );
-	gCamera.mRotation = 0.0f;
+	gCamera.mPosition = Thor::Vec4(0.0f, 0.0f, -3.0f );
+	gCamera.mRotationX = 0.0f;
+	gCamera.mRotationY = 0.0f;
 
 
 	result = D3DXCreateEffectFromFile( d3ddev, L"fx/gbuffer.fx", NULL, NULL, 
@@ -313,12 +350,74 @@ void SetupCamera(void)
   
 	// set the view matrix
 	D3DXVECTOR3 EyePoint(gCamera.mPosition.GetX(),gCamera.mPosition.GetY(),gCamera.mPosition.GetZ());
-	D3DXVECTOR3 LookAt(0.0f, 1.0f, 0.0f);
+	D3DXVECTOR3 LookAt(0.0f, 0.0f, 0.0f);
 	D3DXVECTOR3 UpVector(0.0f, 1.0f, 0.0f);
 	D3DXMatrixLookAtLH(&ViewMatrix, &EyePoint, &LookAt, &UpVector);
 
-	d3ddev->SetTransform(D3DTS_VIEW, &ViewMatrix);
+	d3ddev->SetTransform(D3DTS_VIEW, &gCamera.mMatrix);
+	//d3ddev->SetTransform(D3DTS_VIEW, &ViewMatrix);
 }
+
+
+void FlyCam(float frameTime)
+{
+	static float moveSpeed = 0.8f;
+	static float rotSpeed = 0.2f;
+
+	// process input 
+	float angleX=0.0f, angleY=0.0f;
+	Thor::Vec4 movement(0.0f, 0.0f, 0.0f);
+	if(keys['W'])
+		movement.SetZ( moveSpeed * frameTime );
+	if(keys['S'])
+		movement.SetZ( -moveSpeed * frameTime );
+	if(keys['A'])
+		movement.SetX( -moveSpeed * frameTime );
+	if(keys['D'])
+		movement.SetX( moveSpeed * frameTime );
+
+	// 37 left 38 up 39 right 40 down
+	if(keys[37])
+		angleY -= rotSpeed * frameTime;
+	if(keys[39])
+		angleY += rotSpeed * frameTime;
+	if(keys[38])
+		angleX += rotSpeed * frameTime;
+	if(keys[40])
+		angleX -= rotSpeed * frameTime;
+
+	gCamera.mRotationX += angleX;
+	gCamera.mRotationY += angleY;
+
+
+
+	// create matrix which maps from world space to view space
+	D3DXMATRIX mat;
+
+	D3DXMATRIX matYaw;
+	D3DXMatrixRotationY( &matYaw, gCamera.mRotationY );
+
+	D3DXMATRIX matPitch;
+	D3DXMatrixRotationX( &matPitch, gCamera.mRotationX );
+
+	mat = matYaw * matPitch;
+
+
+	// transform
+	D3DXVECTOR4 moveVS( movement.GetX(), movement.GetY(), movement.GetZ(), 1.0f );
+	D3DXVec4Transform( &moveVS, &moveVS, &mat );
+	movement.SetX( moveVS.x ); movement.SetY( moveVS.y ); movement.SetZ( moveVS.z );
+
+	gCamera.mPosition += movement;
+
+	// inverse translation
+	mat._41 = -gCamera.mPosition.GetX();
+	mat._42 = -gCamera.mPosition.GetY();
+	mat._43 = -gCamera.mPosition.GetZ();
+
+	gCamera.mMatrix = mat;
+}
+
 
 
 // Sweep through all local matrices, transform them
@@ -402,6 +501,9 @@ void render_frame(void)
 
 	// update scene
 	gModel->Update();
+	gPlane->Update();
+
+	// update camera
 
 
 
@@ -411,6 +513,7 @@ void render_frame(void)
 	TransformAllMatrices(0, gNumWorldMatrices, identity);
 
 	// set view parameters (World, View and Proj matrices)
+	FlyCam(0.066f);
 	SetupCamera();
 
 	// calculate WorldViewProj matrix
@@ -458,6 +561,7 @@ void render_frame(void)
 
 		// Render the mesh with the applied technique
 		gModel->Render();
+		gPlane->Render();
 
 		pFX_GBuffer->EndPass();
 	}
@@ -622,6 +726,7 @@ void render_frame(void)
 			pFX_Model->BeginPass(0);
 
 			gModel->Render();
+			gPlane->Render();
 
 			pFX_Model->EndPass();
 		pFX_Model->End();

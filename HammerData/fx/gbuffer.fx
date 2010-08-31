@@ -36,9 +36,9 @@ struct VS_OUTPUT
 {
     float4 Position   : POSITION;
     float2 Texture    : TEXCOORD0;
-    float3 NormalX    : TEXCOORD1;
-    float3 NormalY    : TEXCOORD2;
-    float3 NormalZ    : TEXCOORD3;
+    float3 Normal     : TEXCOORD1;
+    float3 Tangent    : TEXCOORD2;
+    float3 Bitangent  : TEXCOORD3;
     float2 Depth      : TEXCOORD4;
 };
 
@@ -58,9 +58,9 @@ VS_OUTPUT vs_main( in VS_INPUT In )
     //Out.Normal = mul(In.Normal, WorldViewProj); // transform Normal
 
 	// create matrix mapping from tangent-space to view-space to transform the bump map
-	Out.NormalX = -mul( In.Tangent, WorldViewProj );
-	Out.NormalY = -mul( In.Normal, WorldViewProj );
-	Out.NormalZ = -mul( In.Bitangent, WorldViewProj );	
+	Out.Tangent	  = mul( float4( In.Tangent, 0.0f),   WorldViewProj ).xyz;
+	Out.Bitangent = mul( float4( In.Bitangent, 0.0f), WorldViewProj ).xyz;	
+	Out.Normal    = mul( float4( -In.Normal, 0.0f),   WorldViewProj ).xyz;
 
 	// non-linear depth
 	//Out.Depth = (Out.Position.z/Out.Position.w); 
@@ -94,11 +94,18 @@ PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
     // perturb normal based on normal map
     float4 nrmMap = tex2D( NormalSampler, In.Texture );
     
-    // transform bump from tangent space to viewspace
-    float3x3 nrmMat = float3x3( normalize(In.NormalX), normalize(In.NormalY), normalize(In.NormalZ) );
-    float3 normal = float3(0.0f, 1.0f, 0.0f);
+    //float3 nrmIn = nrmMap.xyz;
+    float3 nrmIn = float3(0,0,1);
     
-    normal = mul( normal, nrmMat );
+    //float3 normal;
+    //normal.x = dot( nrmIn, normalize(In.Tangent) );
+    //normal.y = dot( nrmIn, normalize(In.Bitangent) );
+    //normal.z = dot( nrmIn, normalize(In.Normal) );
+
+    
+    // transform bump from tangent space to viewspace
+    float3x3 nrmMat = float3x3( normalize(In.Tangent), normalize(In.Bitangent), normalize(In.Normal) );
+    float3 normal = mul( nrmIn, nrmMat );
     
 
 	// pack normal and depth	
