@@ -65,6 +65,10 @@ void UpdateFPS()
 }
 
 
+int gMainRes[] = {800, 600};
+int gRTRes[] = {800,600};
+
+
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
@@ -91,7 +95,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
                           L"Thor",
                           WS_OVERLAPPEDWINDOW,
                           80, 0,
-                          800, 600,
+                          gMainRes[0], gMainRes[1],
                           NULL,
                           NULL,
                           hInstance,
@@ -192,6 +196,7 @@ LPDIRECT3DPIXELSHADER9       GBufferShader = NULL; //PS (NEW)
 ID3DXEffect*				pFX_GBuffer = NULL;
 ID3DXEffect*				pFX_Lighting = NULL;
 ID3DXEffect*				pFX_Model = NULL;
+ID3DXEffect*				pFX_Forward = NULL;
 
 LPDIRECT3DTEXTURE9 pGBufferTexture = NULL, pLightBufferTexture = NULL;
 LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pLightBufferSurface = NULL, pBackBuffer = NULL;
@@ -249,7 +254,7 @@ void initD3D(HWND hWnd)
 								&d3dpp,
 								&d3ddev);
 
-	result = d3ddev->CreateDepthStencilSurface( 800, 600, D3DFMT_D24S8, D3DMULTISAMPLE_NONE, 0, TRUE, &pZBuffer, NULL );
+	result = d3ddev->CreateDepthStencilSurface( gMainRes[0], gMainRes[1], D3DFMT_D24S8, D3DMULTISAMPLE_NONE, 0, TRUE, &pZBuffer, NULL );
 
 	d3ddev->SetRenderState(D3DRS_AMBIENT,RGB(0,0,0));
 	d3ddev->SetRenderState(D3DRS_LIGHTING, false);
@@ -271,7 +276,7 @@ void initD3D(HWND hWnd)
 	// Create G Buffer
 
 	result = d3ddev->CreateTexture( 
-				512, 512, 1,
+				gRTRes[0], gRTRes[1], 1,
 				D3DUSAGE_RENDERTARGET,
 				D3DFMT_A8R8G8B8,
 				D3DPOOL_DEFAULT,
@@ -285,7 +290,7 @@ void initD3D(HWND hWnd)
 	// Create Light buffer
 
 	result = d3ddev->CreateTexture(
-				512, 512, 1,
+				gRTRes[0], gRTRes[1], 1,
 				D3DUSAGE_RENDERTARGET,
 				D3DFMT_A8R8G8B8,
 				D3DPOOL_DEFAULT,
@@ -322,6 +327,15 @@ void initD3D(HWND hWnd)
 		errors->Release();
 	}
 
+	result = D3DXCreateEffectFromFile( d3ddev, L"fx/forward.fx", NULL, NULL,
+										0, NULL, &pFX_Forward, &errors );
+	if( FAILED( result ) )
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
+	}
+
+
 	gModel = new Thor::Model();
 	gModel->LoadModel( "duck.bbg" );
 
@@ -343,7 +357,7 @@ float gFarClip = 100.0f;
 void SetupCamera(void)
 {
 	D3DXMATRIXA16 ProjectionMatrix;
-	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, 800.0f/600.0f, gNearClip, gFarClip);
+	D3DXMatrixPerspectiveFovLH(&ProjectionMatrix, PI/4, (float)gMainRes[0]/(float)gMainRes[1], gNearClip, gFarClip);
 	d3ddev->SetTransform(D3DTS_PROJECTION, &ProjectionMatrix);
 
 	Thor::Matrix ViewMatrix;
@@ -601,7 +615,7 @@ void render_frame(void)
 	pFX_Lighting->SetFloat( "FarClip", gFarClip );
 
 	
-	float gbufferSize[] = {512.0f, 512.0f };
+	float gbufferSize[] = {(float)gRTRes[0], (float)gRTRes[1] };
 	//float gbufferSize[] = {256.0f, 256.0f };
 	pFX_Lighting->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
 
@@ -631,7 +645,7 @@ void render_frame(void)
 
 		// Render a full screen quad for the directional light pass
 		// use Gui system!
-		gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
+		gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
 		gui->Render(d3ddev);
 
 		pFX_Lighting->EndPass();
@@ -706,7 +720,7 @@ void render_frame(void)
 				//pFX_Lighting->CommitChanges();
 
 				// Render a full screen quad for the light - room for improvement here :)
-				gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
+				gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
 				gui->Render(d3ddev);
 			//}
 
