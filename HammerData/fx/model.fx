@@ -95,12 +95,12 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
     
 	float3 diffCol = float3( lighting.xyz );
 	
-	float SpecularPower_0 = 5.0f;
+	float SpecularPower_0 = 10.0f;
 	float specular = pow( lighting.w, SpecularPower_0);
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
 
-	float specIntens = 0.2f;
+	float specIntens = 0.3f;
 	float diffIntens = 1.0f;
 	
 	// get diffuse colour here

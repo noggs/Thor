@@ -58,9 +58,9 @@ VS_OUTPUT vs_main( in VS_INPUT In )
     //Out.Normal = mul(In.Normal, WorldViewProj); // transform Normal
 
 	// create matrix mapping from tangent-space to view-space to transform the bump map
-	Out.Tangent	  = mul( float4( In.Tangent, 0.0f),   WorldViewProj ).xyz;
-	Out.Bitangent = mul( float4( In.Bitangent, 0.0f), WorldViewProj ).xyz;	
-	Out.Normal    = mul( float4( -In.Normal, 0.0f),   WorldViewProj ).xyz;
+	Out.Tangent	  = mul( float4( In.Tangent, 0.0f),   WorldView ).xyz;
+	Out.Bitangent = mul( float4( In.Bitangent, 0.0f), WorldView ).xyz;	
+	Out.Normal    = mul( float4( In.Normal, 0.0f),   WorldView ).xyz;
 
 	// non-linear depth
 	//Out.Depth = (Out.Position.z/Out.Position.w); 
@@ -107,6 +107,9 @@ PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
     float3x3 nrmMat = float3x3( normalize(In.Tangent), normalize(In.Bitangent), normalize(In.Normal) );
     float3 normal = mul( nrmIn, nrmMat );
     
+    //Out.Color = float4( (normal+1)/2, 1.0f );
+    //return Out;
+
 
 	// pack normal and depth	
 	Out.Color = float4( PackNormal(normal), F32_Compress(depth) );
@@ -117,8 +120,7 @@ PS_OUTPUT ps_packNormalDepth( in VS_OUTPUT In )
 	
 	// test unpacking the normal
 	//float3 un = UnpackNormal(Out.Color.xy);
-	//Out.Color = float4( un, 1.0f );
-	//Out.Color = float4( (un.x+1.0f)/2.0f, 0.0f, 0.0f, 1.0f );
+    //Out.Color = float4( (un+1)/2, 1.0f );
 
     return Out;                                //return output pixel
 }

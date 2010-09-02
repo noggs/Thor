@@ -295,18 +295,6 @@ void initD3D(HWND hWnd)
 	result = pLightBufferTexture->GetSurfaceLevel(0, &pLightBufferSurface);
 
 
-	gModel = new Thor::Model();
-	gModel->LoadModel( "duck.bbg" );
-
-	gPlane = new Thor::Model();
-	gPlane->LoadModel( "plane_xz_200.bbg" );
-
-
-	gCamera.mPosition = Thor::Vec4(0.0f, 4.0f, -3.0f );
-	gCamera.mRotationX = 0.77f;
-	gCamera.mRotationY = 0.0f;
-
-
 	result = D3DXCreateEffectFromFile( d3ddev, L"fx/gbuffer.fx", NULL, NULL, 
 										0, NULL, &pFX_GBuffer, &errors );
 
@@ -333,6 +321,18 @@ void initD3D(HWND hWnd)
 		char* szErrors = (char*)errors->GetBufferPointer();
 		errors->Release();
 	}
+
+	gModel = new Thor::Model();
+	gModel->LoadModel( "duck.bbg" );
+
+	gPlane = new Thor::Model();
+	gPlane->LoadModel( "plane_xz_200.bbg" );
+
+
+	gCamera.mPosition = Thor::Vec4(0.0f, 1.0f, -4.0f );
+	gCamera.mRotationX = 0.0f;
+	gCamera.mRotationY = 0.0f;//3.142f/2.0f;
+
 
 }
 
@@ -469,8 +469,8 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 IDirect3DTexture9* duckTexture = NULL;
 IDirect3DTexture9* duckNrmTexture = NULL;
 
-Thor::Vec4 gDirLightPos(0.7f, 0.0f, -0.7f, 0.0f);
-float gDirLightColour[] = {0.5f, 0.5f, 0.5f};
+Thor::Vec4 gDirLightPos(0.77f, 0.77f, 0.0f, 0.0f);
+float gDirLightColour[] = {1.0f, 1.0f, 1.0f};
 
 struct Light
 {
@@ -484,7 +484,7 @@ Light gPointLights[] = {
 	{ Thor::Vec4(-1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.0f, 0.6f, 0.0f} },
 	{ Thor::Vec4(0.0f, -1.0f, 0.0f, 1.0f), 5.0f, {1.0f, 1.0f, 1.0f} },
 };
-int gPointLightsNum = 2;
+int gPointLightsNum = 0;
 
 
 
@@ -644,74 +644,79 @@ void render_frame(void)
 	//////////////////////////////////////////////////////////////////////////
 	// Now render all the point lights
 
-	// Setup lighting parameters
+	if( gPointLightsNum > 0 )
 	{
-		const int MaxLights = 8;
-		D3DXVECTOR3 lightPos[MaxLights];
-		float lightColour[3*MaxLights];
-		float lightRadius[MaxLights];
 
-		int i;
-		for(i=0; i<gPointLightsNum && i<MaxLights; ++i)
+		// Setup lighting parameters
 		{
-			const Light& light = gPointLights[i];
+			const int MaxLights = 8;
+			D3DXVECTOR3 lightPos[MaxLights];
+			float lightColour[3*MaxLights];
+			float lightRadius[MaxLights];
 
-			// transform pos into view space
-			D3DXVECTOR4 tempPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), 1.0f );
-			D3DXVECTOR4 xformPos;
-			D3DXVec4Transform( &xformPos, &tempPos, &matView );
+			int i;
+			for(i=0; i<gPointLightsNum && i<MaxLights; ++i)
+			{
+				const Light& light = gPointLights[i];
 
-			lightPos[i] = D3DXVECTOR3(xformPos.x, xformPos.y, xformPos.z);
+				// transform pos into view space
+				D3DXVECTOR4 tempPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), 1.0f );
+				D3DXVECTOR4 xformPos;
+				D3DXVec4Transform( &xformPos, &tempPos, &matView );
 
-			lightColour[0 + (i*3)] = light.colour[0];
-			lightColour[1 + (i*3)] = light.colour[1];
-			lightColour[2 + (i*3)] = light.colour[2];
+				lightPos[i] = D3DXVECTOR3(xformPos.x, xformPos.y, xformPos.z);
 
-			lightRadius[i] = light.radius;
+				lightColour[0 + (i*3)] = light.colour[0];
+				lightColour[1 + (i*3)] = light.colour[1];
+				lightColour[2 + (i*3)] = light.colour[2];
+
+				lightRadius[i] = light.radius;
+			}
+
+			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
+			pFX_Lighting->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
+			pFX_Lighting->SetFloatArray( "LightRadius", &lightRadius[0], i );
+			pFX_Lighting->SetInt( "CurNumLights", gPointLightsNum-1 );
+			pFX_Lighting->CommitChanges();
 		}
 
-		pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
-		pFX_Lighting->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
-		pFX_Lighting->SetFloatArray( "LightRadius", &lightRadius[0], i );
-		pFX_Lighting->SetInt( "CurNumLights", gPointLightsNum-1 );
-		pFX_Lighting->CommitChanges();
+
+		pFX_Lighting->SetTechnique("PointLight");
+
+		d3ddev->BeginScene();
+
+		// Apply the technique contained in the effect 
+		pFX_Lighting->Begin(&cPasses, 0);
+		for (iPass = 0; iPass < cPasses; iPass++)
+		{
+			pFX_Lighting->BeginPass(iPass);
+
+			// for each positional light...
+			//for(int i=0; i<gPointLightsNum; ++i)
+			//{
+			//	const Light& light = gPointLights[i];
+
+				// position in ViewSpace
+				//D3DXVECTOR4 lightPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), light.pos.GetW() );
+				//D3DXVec4Transform( &lightPos, &lightPos, &matView );
+				//pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 3 );
+				//pFX_Lighting->SetFloatArray( "LightColourDif", &light.colour[0], 3 );
+				//pFX_Lighting->SetFloatArray( "LightRadius", &light.radius,1 );
+
+				//pFX_Lighting->CommitChanges();
+
+				// Render a full screen quad for the light - room for improvement here :)
+				gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
+				gui->Render(d3ddev);
+			//}
+
+			pFX_Lighting->EndPass();
+		}
+		pFX_Lighting->End();
+
+		d3ddev->EndScene();
+
 	}
-
-
-	pFX_Lighting->SetTechnique("PointLight");
-
-	d3ddev->BeginScene();
-
-	// Apply the technique contained in the effect 
-	pFX_Lighting->Begin(&cPasses, 0);
-	for (iPass = 0; iPass < cPasses; iPass++)
-	{
-		pFX_Lighting->BeginPass(iPass);
-
-		// for each positional light...
-		//for(int i=0; i<gPointLightsNum; ++i)
-		//{
-		//	const Light& light = gPointLights[i];
-
-			// position in ViewSpace
-			//D3DXVECTOR4 lightPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), light.pos.GetW() );
-			//D3DXVec4Transform( &lightPos, &lightPos, &matView );
-			//pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 3 );
-			//pFX_Lighting->SetFloatArray( "LightColourDif", &light.colour[0], 3 );
-			//pFX_Lighting->SetFloatArray( "LightRadius", &light.radius,1 );
-
-			//pFX_Lighting->CommitChanges();
-
-			// Render a full screen quad for the light - room for improvement here :)
-			gui->DrawTexturedRect(0, 0, 512, 512, pGBufferTexture );
-			gui->Render(d3ddev);
-		//}
-
-		pFX_Lighting->EndPass();
-	}
-	pFX_Lighting->End();
-
-	d3ddev->EndScene();
 
 
 	/////////////////////

@@ -100,21 +100,26 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
     float4 gvalue = tex2D( GBufferSampler, uv );
     //Out.Color = gvalue;
     
-    // extract normal
-    float3 nrm = UnpackNormal( gvalue.xy );	// gets the normal in viewspace
-    //Out.Color = float4( nrm, 1.0f );
-    //Out.Color = float4( (nrm.y+1.0f)/2.0f, 0.0f, 0.0f, 1.0f );
+    //float3 nrm = (gvalue.xyz*2)-1;
     
-    // extract depth
-    float depth = F32_Decompress(gvalue.zw);
-	//Out.Color = float4( depth, depth, depth, 1.0f );
+    // extract surface normal
+    float3 nrm = UnpackNormal( gvalue.xy );	// gets the normal in viewspace
+    //Out.Color = float4( (nrm+1)/2, 1.0f );
+    //Out.Color = float4( (nrm.y+1.0f)/2.0f, 0.0f, 0.0f, 1.0f );
+    //return Out;
+    
+	float3 lightDir = LightDirVS;
 	
 	// surface normal to light angle
-	float NL = dot( LightDirVS, nrm );
+	float NL = dot( lightDir, nrm );
+	
+	//Out.Color = float4( NL, NL, NL, 1.0f );
+	//return Out;
 	
 	// now calculate specular component
-	float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
-	float specular = pow( saturate( dot( reflect(eyeVec, nrm), LightDirVS)), 10);
+	float3 eyeVec = float3(0.0f, 0.0f, 1.0f);	// in ViewSpace so camera is always here!
+	float specular = pow( saturate( dot( reflect(eyeVec, nrm), lightDir)), 1 );
+	specular = 0;
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
     

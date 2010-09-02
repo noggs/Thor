@@ -24,14 +24,14 @@ float F32_Decompress(float2 vec)
 
 float2 PackNormal(float3 nrm)
 {
-	return float2((nrm.x+1.0f)/2.0f, (nrm.y+1.0f)/2.0f);
+	return float2((nrm.x+1.0f)*0.5f, (nrm.y+1.0f)*0.5f);
 }
 
 float3 UnpackNormal(float2 nrm)
 {
 	float x = (nrm.x*2.0f)-1.0f;
 	float y = (nrm.y*2.0f)-1.0f;
-	return float3( x, y, sqrt(1-(x*x)-(y*y)) );
+	return float3( x, y, -sqrt(1-(x*x)-(y*y)) );
 }
 
 
