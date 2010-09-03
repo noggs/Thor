@@ -8,6 +8,9 @@
 #include <math/Matrix.h>
 #include <gui/Gui.h>
 
+#include <core/Mutex.h>
+#include <core/Thread.h>
+
 static const float PI = 3.1415f;
 
 // include the Direct3D Library file

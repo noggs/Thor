@@ -186,6 +186,22 @@
 				>
 			</File>
 		</Filter>
+		<Filter
+			Name="core"
+			>
+			<File
+				RelativePath="..\..\core\Mutex.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\core\Mutex.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\core\Thread.h"
+				>
+			</File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>

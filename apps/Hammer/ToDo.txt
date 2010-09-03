@@ -13,22 +13,13 @@ Light pre-pass renderer
 4bI. Divide screen into tiles
 [DONE] 5. Switch to forward render and look-up into light buffer for lighting information
 6. Use linear depth instead of /w depth
-
-FREE CAM WHEN CLICKED!
+7. Implement straight multi-pass forward renderer for comparison
 
 
 Divide screen into tiles
 Transform light volumes into screenspace
 Sort tiles by number of lights
 For each tile group set technique, light info and render tiles
-
-OR
-
-For each light
-Transform volume into viewspace
-per-pixel:
-	Use inverse Proj matrix to get viewspace position
-	
 
 
 
@@ -37,6 +28,15 @@ Misc
 Handle textured models (names/purpose [nrm/dif/spc] in model format)
 FPS counter
 Build system for assets...!
+
+Resource system with hotloading
+	Thread sits there watching for file changes
+	Locate Resource associated (shader,model,texture) and sends it a reload message
+	
+FX system
+Worker thread system
+	Lock-free (or locking!) queue of work to be done
+	Wrapper around system thread?
 
 
 Code Management
