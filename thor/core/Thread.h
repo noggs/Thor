@@ -5,13 +5,6 @@ namespace Thor
 {
 	typedef DWORD ThreadID;
 
-	enum ThreadPriority
-	{
-		LOW			= THREAD_PRIORITY_LOWEST,
-		NORMAL		= THREAD_PRIORITY_NORMAL,
-		HIGH		= THREAD_PRIORITY_HIGHEST,
-		CRITICAL	= THREAD_PRIORITY_TIME_CRITICAL
-	};
 
 	class Thread
 	{
@@ -19,7 +12,7 @@ namespace Thor
 		Thread();
 		~Thread();
 
-		void start( AutoRef<IVoidDelegate> aDelegate,  ThreadPriority  priority = NORMAL, bool suspended = false, int stackSize = 64*1024 );
+		//void start( AutoRef<IVoidDelegate> aDelegate, int priority = 2, bool suspended = false, int stackSize = 64*1024 );
 
 		void suspend( void );
 		void resume( void );

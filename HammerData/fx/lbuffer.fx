@@ -103,7 +103,7 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
     //float3 nrm = (gvalue.xyz*2)-1;
     
     // extract surface normal
-    float3 nrm = UnpackNormal( gvalue.xy );	// gets the normal in viewspace
+    float3 nrm = -UnpackNormal( gvalue.xy );	// gets the normal in viewspace
     //Out.Color = float4( (nrm+1)/2, 1.0f );
     //Out.Color = float4( (nrm.y+1.0f)/2.0f, 0.0f, 0.0f, 1.0f );
     //return Out;
@@ -111,7 +111,7 @@ PS_OUTPUT ps_DirLight( in VS_OUTPUT In )
 	float3 lightDir = LightDirVS;
 	
 	// surface normal to light angle
-	float NL = dot( lightDir, nrm );
+	float NL = saturate( dot( lightDir, nrm ) );
 	
 	//Out.Color = float4( NL, NL, NL, 1.0f );
 	//return Out;
@@ -155,7 +155,7 @@ PS_OUTPUT ps_light( uniform const int NumLights, in VS_OUTPUT In )
     //return Out;
     
     // extract normal
-    float3 nrm = UnpackNormal( gvalue.xy );	// gets the normal in viewspace
+    float3 nrm = -UnpackNormal( gvalue.xy );	// gets the normal in viewspace
     //Out.Color = float4( nrm, 1.0f );
     
     // extract depth
@@ -180,13 +180,16 @@ PS_OUTPUT ps_light( uniform const int NumLights, in VS_OUTPUT In )
 		// for now use linear falloff: 1-(lightDist/LightRadius[i])
 	    
 		float att = saturate( 1.0f - (lightDist/LightRadius[i]) );
-		float NL = dot( lightDir, nrm ) * att;
+		float NL = saturate( dot( lightDir, nrm ) ) * att;
+		
+		//Out.Color += float4( NL,0,0, 0 );
 
 		//Out.Color = float4(LightColourDif * NL, 1.0f);
 
 		// now calculate specular component
-		float3 eyeVec = float3(0.0f, 0.0f, -1.0f);	// in ViewSpace so camera is always here!
+		float3 eyeVec = float3(0.0f, 0.0f, 1.0f);	// in ViewSpace so camera is always here!
 		float specular = pow( saturate( dot( reflect(eyeVec, nrm), lightDir)), 10 );
+		specular = 0;
 		
 		//Out.Color = float4( specular, specular, specular, 1.0f );
 		

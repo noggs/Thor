@@ -69,7 +69,7 @@ void UpdateFPS()
 
 
 int gMainRes[] = {800, 600};
-int gRTRes[] = {800,600};
+int gRTRes[] = {512,512};
 
 
 // the entry point for any Windows program
@@ -486,8 +486,8 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 IDirect3DTexture9* duckTexture = NULL;
 IDirect3DTexture9* duckNrmTexture = NULL;
 
-Thor::Vec4 gDirLightPos(0.77f, 0.77f, 0.0f, 0.0f);
-float gDirLightColour[] = {1.0f, 1.0f, 1.0f};
+Thor::Vec4 gDirLightPos(0.77f, -0.77f, 0.0f, 0.0f);
+float gDirLightColour[] = {0.3f, 0.3f, 0.3f};
 
 struct Light
 {
@@ -499,9 +499,9 @@ struct Light
 Light gPointLights[] = {
 	{ Thor::Vec4(1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.6f, 0.0f, 0.0f} },
 	{ Thor::Vec4(-1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.0f, 0.6f, 0.0f} },
-	{ Thor::Vec4(0.0f, -1.0f, 0.0f, 1.0f), 5.0f, {1.0f, 1.0f, 1.0f} },
+	{ Thor::Vec4(0.0f, 3.0f, 0.0f, 1.0f), 5.0f, {1.0f, 1.0f, 1.0f} },
 };
-int gPointLightsNum = 0;
+int gPointLightsNum = 3;
 
 
 
@@ -531,7 +531,7 @@ void render_frame(void)
 
 	// update scene
 	//gModel->Update();
-	//gPlane->Update();
+	gPlane->Update();
 
 	// update camera
 
@@ -559,6 +559,9 @@ void render_frame(void)
 
 	D3DXMATRIXA16 matInvProj;
 	D3DXMatrixInverse( &matInvProj, NULL, &matProj );
+
+	D3DXMATRIXA16 matInvWorldView;
+	D3DXMatrixInverse( &matInvWorldView, NULL, &matWorldView );
 
 	////////////////////
 	// Step 1 - render the scene into GBuffer storing normals and depth
@@ -628,6 +631,7 @@ void render_frame(void)
 		D3DXVECTOR4 lightDir( gDirLightPos.GetX(), gDirLightPos.GetY(), gDirLightPos.GetZ(), gDirLightPos.GetW() );
 		D3DXVec4Transform( &lightDir, &lightDir, &matView );
 		pFX_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
+		pFX_Forward->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
 	}
 
 
@@ -637,6 +641,7 @@ void render_frame(void)
 	pFX_Lighting->SetTechnique("DirectionalLight");
 
 	pFX_Lighting->SetFloatArray( "LightColourDif", &gDirLightColour[0], 3 );
+	pFX_Forward->SetFloatArray( "LightColourDifDir", &gDirLightColour[0], 3 );
 
 #if 1
 	// Apply the technique contained in the effect 
@@ -695,6 +700,12 @@ void render_frame(void)
 			pFX_Lighting->SetFloatArray( "LightRadius", &lightRadius[0], i );
 			pFX_Lighting->SetInt( "CurNumLights", gPointLightsNum-1 );
 			pFX_Lighting->CommitChanges();
+
+			pFX_Forward->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
+			pFX_Forward->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
+			pFX_Forward->SetFloatArray( "LightRadius", &lightRadius[0], i );
+			pFX_Forward->SetInt( "CurNumLights", gPointLightsNum-1 );
+			pFX_Forward->CommitChanges();
 		}
 
 
@@ -745,6 +756,10 @@ void render_frame(void)
 	// clear the window to a deep blue
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
 					D3DCOLOR_RGBA(0, 40, 100, 0), 1.0f, 0);
+
+	if( keys['G'] )
+	{
+
 	d3ddev->BeginScene();    // begins the 3D scene
 
 		pFX_Model->SetMatrix( "WorldViewProj", &matWorldViewProj);
@@ -774,6 +789,37 @@ void render_frame(void)
 
 
 	d3ddev->EndScene();
+
+
+	} else {
+
+
+	pFX_Forward->SetMatrix( "WorldViewProj", &matWorldViewProj);
+	pFX_Forward->SetMatrix( "WorldView", &matWorldView);
+	pFX_Forward->SetMatrix( "InvWorldView", &matInvWorldView );
+
+	pFX_Forward->SetTexture( "NormalMap", duckNrmTexture );
+	pFX_Forward->SetTexture( "DiffuseMap", duckTexture );
+	pFX_Forward->CommitChanges();
+
+	d3ddev->BeginScene();
+
+	// Apply the technique contained in the effect 
+	pFX_Forward->Begin(&cPasses, 0);
+	for (iPass = 0; iPass < cPasses; iPass++)
+	{
+		pFX_Forward->BeginPass(iPass);
+			gModel->Render();
+			gPlane->Render();
+		pFX_Forward->EndPass();
+	};
+
+	d3ddev->EndScene();
+
+	}
+
+
+
 	d3ddev->Present(NULL, NULL, NULL, NULL);    // displays the created frame
 
 }
@@ -785,3 +831,15 @@ void cleanD3D(void)
     d3ddev->Release();    // close and release the 3D device
     d3d->Release();    // close and release Direct3D
 }
+
+
+
+
+
+
+
+
+
+
+
+

@@ -12,6 +12,12 @@ namespace Thor
 		IDirect3DTexture9*	mTexture;
 	};
 
+	class TextureCache
+	{
+	public:
+		Texture*	Load(const char* fileName);
+	};
+
 
 	class Effect
 	{
@@ -33,11 +39,53 @@ namespace Thor
 	};
 
 
-	class Camera
+	class BoundingSphere
+	{
+	public:
+		Vec4	mPosition;
+		float	mRadius;
+	};
+
+
+	class Node
+	{
+	public:
+	private:
+		int	mLocalMatrixID;
+		int	mWorldMatrixID;
+	};
+
+
+	class Camera : public Node
 	{
 	public:
 
 	private:
+	};
+
+
+	class Colour
+	{
+	public:
+		void GetAsFloatArray(float* out);
+	private:
+		DWORD mData;
+	};
+
+
+	///
+	class Light : public Node
+	{
+	public:
+		Colour	mDiffuse;
+		Colour	mSpecular;
+	};
+
+	class PointLight : public Light
+	{
+	public:
+		Vec4	mPosition;
+		float	mRadius;
 	};
 
 
@@ -52,6 +100,9 @@ namespace Thor
 	private:
 		Model*	mModels[32];
 		int		mNumModels;
+
+		PointLight	mPointLights[32];
+		int			mNumPointLights;
 	};
 
 

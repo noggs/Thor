@@ -97,6 +97,7 @@ PS_OUTPUT ps_modelTexDiffuse( in VS_OUTPUT In )
 	
 	float SpecularPower_0 = 10.0f;
 	float specular = pow( lighting.w, SpecularPower_0);
+	specular = 0;
 	
 	//Out.Color = float4( specular, specular, specular, 1.0f );
 

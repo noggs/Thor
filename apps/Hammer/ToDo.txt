@@ -25,6 +25,10 @@ For each tile group set technique, light info and render tiles
 
 Misc
 ~~~~
+
+Either seperate World and View matrix and multiply in shader 
+OR pre-compute WorldView and WorldViewProj for each object?
+
 Handle textured models (names/purpose [nrm/dif/spc] in model format)
 FPS counter
 Build system for assets...!
@@ -36,7 +40,6 @@ Resource system with hotloading
 FX system
 Worker thread system
 	Lock-free (or locking!) queue of work to be done
-	Wrapper around system thread?
 
 
 Code Management
