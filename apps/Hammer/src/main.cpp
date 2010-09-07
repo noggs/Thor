@@ -220,6 +220,8 @@ Camera gCamera;
 
 Thor::Model* gModel = NULL;
 Thor::Model* gPlane = NULL;
+Thor::Model* gTiny = NULL;
+
 
 
 Thor::Matrix gWorldMatrices[10];
@@ -268,7 +270,6 @@ void initD3D(HWND hWnd)
 
 	gui = new Thor::Gui(d3ddev);
 
-	LPD3DXBUFFER code = NULL; //Temporary buffers
 	LPD3DXBUFFER errors = NULL;
 
 	LPCSTR vshProf = D3DXGetVertexShaderProfile( d3ddev );
@@ -345,8 +346,10 @@ void initD3D(HWND hWnd)
 	gPlane = new Thor::Model();
 	gPlane->LoadModel( "plane_xz_200.bbg" );
 
+	gTiny = new Thor::Model();
+	gTiny->LoadModel( "tiny.bbg" );
 
-	gCamera.mPosition = Thor::Vec4(0.0f, 1.0f, -4.0f );
+	gCamera.mPosition = Thor::Vec4(0.0f, 1.5f, -6.0f );
 	gCamera.mRotationX = 0.0f;
 	gCamera.mRotationY = 0.0f;//3.142f/2.0f;
 
@@ -354,7 +357,7 @@ void initD3D(HWND hWnd)
 }
 
 
-float gNearClip = 2.0f;
+float gNearClip = 0.1f;
 float gFarClip = 100.0f;
 
 void SetupCamera(void)
@@ -485,8 +488,9 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
 
 IDirect3DTexture9* duckTexture = NULL;
 IDirect3DTexture9* duckNrmTexture = NULL;
+IDirect3DTexture9* skinTexture = NULL;
 
-Thor::Vec4 gDirLightPos(0.77f, -0.77f, 0.0f, 0.0f);
+Thor::Vec4 gDirLightPos(0.577f, -0.577f, 0.577f, 0.0f);
 float gDirLightColour[] = {0.3f, 0.3f, 0.3f};
 
 struct Light
@@ -497,9 +501,9 @@ struct Light
 };
 
 Light gPointLights[] = {
-	{ Thor::Vec4(1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.6f, 0.0f, 0.0f} },
 	{ Thor::Vec4(-1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.0f, 0.6f, 0.0f} },
 	{ Thor::Vec4(0.0f, 3.0f, 0.0f, 1.0f), 5.0f, {1.0f, 1.0f, 1.0f} },
+	{ Thor::Vec4(1.0f, 1.0f, 0.0f, 1.0f), 5.0f, {0.6f, 0.0f, 0.0f} },
 };
 int gPointLightsNum = 3;
 
@@ -516,6 +520,8 @@ int gPointLightsNum = 3;
 //
 
 
+static float gAngle = 0.0f;
+
 
 // this is the function used to render a single frame
 void render_frame(void)
@@ -528,10 +534,43 @@ void render_frame(void)
 	{
 		duckNrmTexture = LoadTexture("brickwork_nrm.png");
 	}
+	if(skinTexture==NULL)
+	{
+		skinTexture = LoadTexture("Tiny_skin.dds");
+	}
 
 	// update scene
+	{
+		gAngle += 0.01f;
+
+		///
+		// DUCK
+
+		// set local transform
+		Thor::Matrix mat;
+		D3DXMatrixRotationY( &mat, gAngle );
+
+		// offset
+		static float radius = 2.0f;
+		mat._41 = radius * sin(gAngle);
+		mat._43 = radius * -cos(gAngle);
+
+		gModel->SetLocalMatrix( mat );
+
+		///
+		// skinned mesh
+		static float scale = 0.005f;
+		static float skinHeight = 2.0f;
+		D3DXMatrixScaling( &mat, scale, scale, scale );
+		mat._42 = skinHeight;
+		gTiny->SetLocalMatrix( mat );
+
+	}
+
+
 	//gModel->Update();
-	gPlane->Update();
+	//gPlane->Update();
+	//gTiny->Update();
 
 	// update camera
 
@@ -546,22 +585,29 @@ void render_frame(void)
 	FlyCam(0.066f);
 	SetupCamera();
 
-	// calculate WorldViewProj matrix
+	// get matrices
     D3DXMATRIXA16 matWorld, matView, matProj;
     d3ddev->GetTransform(D3DTS_WORLD, &matWorld);
     d3ddev->GetTransform(D3DTS_VIEW, &matView);
     d3ddev->GetTransform(D3DTS_PROJECTION, &matProj);
 
-    D3DXMATRIXA16 matWorldViewProj = matWorld * matView * matProj;
 
-	// calculate WorldView matrix
-	D3DXMATRIXA16 matWorldView = matWorld * matView;
+	// calculate all WorldView and WorldViewProj matrices now on CPU...
+	D3DXMATRIXA16 matArrayWorldView[10];
+	D3DXMATRIXA16 matArrayWorldViewProj[10];
+	D3DXMATRIXA16 matArrayInvWorldView[10];
+
+	int i;
+	for(i=0; i<gNumWorldMatrices; ++i)
+	{
+		matArrayWorldView[i] = gWorldMatrices[i] * matView;
+		matArrayWorldViewProj[i] = gWorldMatrices[i] * matView * matProj;
+		D3DXMatrixInverse( &matArrayInvWorldView[i], NULL, &matArrayWorldView[i] );
+	}
 
 	D3DXMATRIXA16 matInvProj;
 	D3DXMatrixInverse( &matInvProj, NULL, &matProj );
 
-	D3DXMATRIXA16 matInvWorldView;
-	D3DXMatrixInverse( &matInvWorldView, NULL, &matWorldView );
 
 	////////////////////
 	// Step 1 - render the scene into GBuffer storing normals and depth
@@ -578,8 +624,6 @@ void render_frame(void)
 	d3ddev->BeginScene();
 
 	// setup shader constants
-	pFX_GBuffer->SetMatrix( "WorldViewProj", &matWorldViewProj);
-	pFX_GBuffer->SetMatrix( "WorldView", &matWorldView);
 	pFX_GBuffer->SetFloat( "FarClip", gFarClip );
 	pFX_GBuffer->SetTexture( "NormalMap", duckNrmTexture );
 	pFX_GBuffer->CommitChanges();
@@ -592,9 +636,20 @@ void render_frame(void)
 	{
 		pFX_GBuffer->BeginPass(iPass);
 
-		// Render the mesh with the applied technique
+		pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0]);
+		pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[0]);
+		pFX_GBuffer->CommitChanges();
 		gModel->Render();
+
+		pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1]);
+		pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[1]);
+		pFX_GBuffer->CommitChanges();
 		gPlane->Render();
+
+		pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
+		pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[2]);
+		pFX_GBuffer->CommitChanges();
+		gTiny->Render();
 
 		pFX_GBuffer->EndPass();
 	}
@@ -615,8 +670,6 @@ void render_frame(void)
 
 	d3ddev->BeginScene();
 
-	pFX_Lighting->SetMatrix( "WorldViewProj", &matWorldViewProj);
-	pFX_Lighting->SetMatrix( "WorldView", &matWorldView);
 	pFX_Lighting->SetMatrix( "InvProj", &matInvProj );
 	pFX_Lighting->SetFloat( "FarClip", gFarClip );
 
@@ -654,7 +707,7 @@ void render_frame(void)
 		// Render a full screen quad for the directional light pass
 		// use Gui system!
 		gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
-		gui->Render(d3ddev);
+		gui->RenderUsingCurrentFX(d3ddev);
 
 		pFX_Lighting->EndPass();
 	}
@@ -719,24 +772,9 @@ void render_frame(void)
 		{
 			pFX_Lighting->BeginPass(iPass);
 
-			// for each positional light...
-			//for(int i=0; i<gPointLightsNum; ++i)
-			//{
-			//	const Light& light = gPointLights[i];
-
-				// position in ViewSpace
-				//D3DXVECTOR4 lightPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), light.pos.GetW() );
-				//D3DXVec4Transform( &lightPos, &lightPos, &matView );
-				//pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos, 3 );
-				//pFX_Lighting->SetFloatArray( "LightColourDif", &light.colour[0], 3 );
-				//pFX_Lighting->SetFloatArray( "LightRadius", &light.radius,1 );
-
-				//pFX_Lighting->CommitChanges();
-
 				// Render a full screen quad for the light - room for improvement here :)
 				gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
-				gui->Render(d3ddev);
-			//}
+				gui->RenderUsingCurrentFX(d3ddev);
 
 			pFX_Lighting->EndPass();
 		}
@@ -757,26 +795,31 @@ void render_frame(void)
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
 					D3DCOLOR_RGBA(0, 40, 100, 0), 1.0f, 0);
 
-	if( keys['G'] )
+	if( !keys['F'] )
 	{
 
 	d3ddev->BeginScene();    // begins the 3D scene
 
-		pFX_Model->SetMatrix( "WorldViewProj", &matWorldViewProj);
 		pFX_Model->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
-		
-		
 		pFX_Model->SetTexture( "LightBufferTexture", pLightBufferTexture );
-		//pFX_Model->SetTexture( "LightBufferTexture", pGBufferTexture );
-
-		pFX_Model->SetTexture( "DiffuseMap", duckTexture );
 		pFX_Model->CommitChanges();
 
 		pFX_Model->Begin(&cPasses, 0);
 			pFX_Model->BeginPass(0);
 
+			pFX_Model->SetTexture( "DiffuseMap", duckTexture );
+			pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0] );
+			pFX_Model->CommitChanges();
 			gModel->Render();
+
+			pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1] );
+			pFX_Model->CommitChanges();
 			gPlane->Render();
+
+			pFX_Model->SetTexture( "DiffuseMap", skinTexture );
+			pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
+			pFX_Model->CommitChanges();
+			gTiny->Render();
 
 			pFX_Model->EndPass();
 		pFX_Model->End();
@@ -794,12 +837,8 @@ void render_frame(void)
 	} else {
 
 
-	pFX_Forward->SetMatrix( "WorldViewProj", &matWorldViewProj);
-	pFX_Forward->SetMatrix( "WorldView", &matWorldView);
-	pFX_Forward->SetMatrix( "InvWorldView", &matInvWorldView );
 
-	pFX_Forward->SetTexture( "NormalMap", duckNrmTexture );
-	pFX_Forward->SetTexture( "DiffuseMap", duckTexture );
+	
 	pFX_Forward->CommitChanges();
 
 	d3ddev->BeginScene();
@@ -809,9 +848,35 @@ void render_frame(void)
 	for (iPass = 0; iPass < cPasses; iPass++)
 	{
 		pFX_Forward->BeginPass(iPass);
+
+			pFX_Forward->SetTexture( "NormalMap", duckNrmTexture );
+			pFX_Forward->SetTexture( "DiffuseMap", duckTexture );
+			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0]);
+			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[0]);
+			pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[0] );
+			pFX_Forward->CommitChanges();
 			gModel->Render();
+
+			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1]);
+			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[1]);
+			pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[1] );
+			pFX_Forward->CommitChanges();
 			gPlane->Render();
+
+			pFX_Forward->SetTexture( "DiffuseMap", skinTexture );
+			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
+			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[2]);
+			pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[2] );
+			pFX_Forward->CommitChanges();
+			gTiny->Render();
+
+
 		pFX_Forward->EndPass();
+
+		gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
+
+		// render 2D overlay
+		gui->Render(d3ddev);
 	};
 
 	d3ddev->EndScene();

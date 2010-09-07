@@ -128,7 +128,7 @@ PS_OUTPUT ps_main( uniform const int NumPointLights, in VS_OUTPUT In )
 		float3 lightDir = LightDirVS;
 	
 		// surface normal to light angle
-		float NL = dot( lightDir, normal );
+		float NL = saturate( dot( lightDir, normal ) );
 
 		// now calculate specular component
 		float3 eyeVec = float3(0.0f, 0.0f, 1.0f);	// in ViewSpace so camera is always here!
@@ -137,7 +137,7 @@ PS_OUTPUT ps_main( uniform const int NumPointLights, in VS_OUTPUT In )
    		// write colour
 		lightColour = float4(LightColourDifDir * NL, 1);
 	}
-
+	
 	// Point lights
 	for( int i = 0; i != NumPointLights; ++i )
 	{

@@ -2,9 +2,6 @@
 #include "utility.h"
 
 // Global variables
-float4x4	WorldViewProj;		// matrix from ObjectSpace to ClipSpace
-float4x4	WorldView;			// matrix from ObjectSpace to EyeSpace
-float4x4	InvWorldViewProj;	// matrix to unproject a point from ClipSpace back to ObjectSpace
 float4x4	InvProj;			// matrix to unproject from ClipSpace to ViewSpace
 float		FarClip;			// farclip plane distance
 float2		GBufferSize;		// dimensions of GBuffer texture
@@ -62,8 +59,7 @@ VS_OUTPUT vs_light( in VS_INPUT In )
 {
     VS_OUTPUT Out;                      //create an output vertex
 
-    //Out.Position = mul(In.Position, WorldViewProj);  //apply vertex transformation
-    
+   
 	// Offset the position by half a pixel to correctly
 	// align texels to pixels. Only necessary for D3D9 or XNA
 	Out.Position.x = In.Position.x - (1.0f/GBufferSize.x);

@@ -171,20 +171,13 @@ void Model::Render()
 }
 
 
-static float gAngle = 0.0f;
+void Model::SetLocalMatrix(const Thor::Matrix &mat)
+{
+	gLocalMatrices[mLocalTransformID] = mat;
+}
 
 void Model::Update()
 {
-	gAngle += 0.01f;
-
-	// set local transform
-	D3DXMatrixRotationY( &gLocalMatrices[mWorldTransformID], gAngle );
-
-	static float scale = 1.0f;
-	Thor::Matrix scaleMat;
-	D3DXMatrixScaling( &scaleMat, scale, scale, scale );
-
-	D3DXMatrixMultiply( &gLocalMatrices[ mWorldTransformID ], &gLocalMatrices[ mWorldTransformID ], &scaleMat );
 }
 
 

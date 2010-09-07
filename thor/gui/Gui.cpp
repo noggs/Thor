@@ -15,6 +15,18 @@ Gui::Gui(IDirect3DDevice9* d3ddev)
 	mCurrentOffset = 0;
 	mMaxVerts = 1024;
 
+	// load FX
+	LPD3DXBUFFER errors = NULL;
+	HRESULT result = D3DXCreateEffectFromFileW( d3ddev, L"fx/gui.fx", NULL, NULL,
+												0, NULL, &mFX, &errors );
+	if( FAILED( result ) )
+	{
+		char* szErrors = (char*)errors->GetBufferPointer();
+		errors->Release();
+	}
+
+
+
 	// create vertex buffer
 	ret = d3ddev->CreateVertexBuffer(mMaxVerts * vertSize, D3DUSAGE_DYNAMIC|D3DUSAGE_WRITEONLY, 0, 
 									 D3DPOOL_DEFAULT, &mVertexBuffer, NULL);
@@ -67,7 +79,18 @@ void Gui::DrawTexturedRect(int left, int top, int width, int height, IDirect3DTe
 }
 
 
-void Gui::Render(IDirect3DDevice9 *d3ddev)
+void Gui::Render(IDirect3DDevice9* d3ddev)
+{
+	RenderInternal(d3ddev, true);
+}
+
+void Gui::RenderUsingCurrentFX(IDirect3DDevice9* d3ddev)
+{
+	RenderInternal(d3ddev, false);
+}
+
+
+void Gui::RenderInternal(IDirect3DDevice9 *d3ddev, bool useGuiFX)
 {
 	HRESULT res;
 
@@ -77,18 +100,35 @@ void Gui::Render(IDirect3DDevice9 *d3ddev)
 		res = d3ddev->SetStreamSource(0, mVertexBuffer, 0, sizeof(GuiVertex));
 		res = d3ddev->SetVertexDeclaration( mVertexDecl );
 
-		int vert = 0;
+		UINT cPasses=1, iPass=0;
+		if(useGuiFX)
+			mFX->Begin( &cPasses, 0 );
 
-		// loop the commands
-		for(int i=0; i<mNumCommands; ++i)
+		for( iPass = 0; iPass < cPasses; ++iPass )
 		{
-			const GuiCmd& cmd = mCommands[i];
+			if(useGuiFX)
+				mFX->BeginPass( iPass );
 
-			res = d3ddev->SetTexture(0, cmd.tex);
-			res = d3ddev->DrawPrimitive(D3DPT_TRIANGLELIST, vert, cmd.numVerts / 3);
+			int vert = 0;
 
-			vert += cmd.numVerts;
+			// loop the commands
+			for(int i=0; i<mNumCommands; ++i)
+			{
+				const GuiCmd& cmd = mCommands[i];
+
+				res = d3ddev->SetTexture(0, cmd.tex);
+				res = d3ddev->DrawPrimitive(D3DPT_TRIANGLELIST, vert, cmd.numVerts / 3);
+
+				vert += cmd.numVerts;
+			}
+
+			if(useGuiFX)
+				mFX->EndPass();
 		}
+
+		if(useGuiFX)
+			mFX->End();
+
 
 		// clear commands
 		mNumVerts = 0;

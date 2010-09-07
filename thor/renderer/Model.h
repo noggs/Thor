@@ -43,6 +43,7 @@ namespace Thor {
 		int				mWorldTransformID;		// index into World matrix array
 		int				mLocalTransformID;		// index into Local matrix array
 		Geometry*		mGeometry;					// pointer to geometry instance
+		float			mScale;
 	};
 
 }
