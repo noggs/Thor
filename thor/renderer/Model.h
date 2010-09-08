@@ -24,6 +24,9 @@ namespace Thor {
 
 		IndexBuffer*	mIndexBuffer;
 		int				mNumIndices;
+
+		int				mNumBones;
+		float*			mBoneMatrices;
 	};
 
 
@@ -37,6 +40,8 @@ namespace Thor {
 		void Update();
 
 		void SetLocalMatrix(const Matrix& );
+
+		Geometry* GetGeometry()		{ return mGeometry; }
 
 	private:
 		std::string		mName;	// always handy for debug

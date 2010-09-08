@@ -347,7 +347,8 @@ void initD3D(HWND hWnd)
 	gPlane->LoadModel( "plane_xz_200.bbg" );
 
 	gTiny = new Thor::Model();
-	gTiny->LoadModel( "tiny.bbg" );
+	gTiny->LoadModel( "tiny_bones.bbg" );
+	//gTiny->LoadModel( "skinnedcube.bbg" );
 
 	gCamera.mPosition = Thor::Vec4(0.0f, 1.5f, -6.0f );
 	gCamera.mRotationX = 0.0f;
@@ -485,6 +486,10 @@ IDirect3DTexture9 *LoadTexture(char *fileName)
   //Return the newly made texture
   return d3dTexture;
 }
+
+
+
+
 
 IDirect3DTexture9* duckTexture = NULL;
 IDirect3DTexture9* duckNrmTexture = NULL;
@@ -795,7 +800,7 @@ void render_frame(void)
 	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
 					D3DCOLOR_RGBA(0, 40, 100, 0), 1.0f, 0);
 
-	if( !keys['F'] )
+	if( keys['F'] )
 	{
 
 	d3ddev->BeginScene();    // begins the 3D scene
@@ -843,7 +848,7 @@ void render_frame(void)
 
 	d3ddev->BeginScene();
 
-	// Apply the technique contained in the effect 
+	pFX_Forward->SetTechnique("DirPointLights");
 	pFX_Forward->Begin(&cPasses, 0);
 	for (iPass = 0; iPass < cPasses; iPass++)
 	{
@@ -853,31 +858,59 @@ void render_frame(void)
 			pFX_Forward->SetTexture( "DiffuseMap", duckTexture );
 			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0]);
 			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[0]);
-			pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[0] );
+			//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[0] );
 			pFX_Forward->CommitChanges();
 			gModel->Render();
 
 			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1]);
 			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[1]);
-			pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[1] );
+			//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[1] );
 			pFX_Forward->CommitChanges();
 			gPlane->Render();
+
+		pFX_Forward->EndPass();
+
+		//gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
+
+		// render 2D overlay
+		gui->Render(d3ddev);
+	}
+	pFX_Forward->End();
+
+
+	pFX_Forward->SetTechnique("DirPointLights_Skin");
+	pFX_Forward->Begin(&cPasses, 0);
+	for (iPass = 0; iPass < cPasses; iPass++)
+	{
+		pFX_Forward->BeginPass(iPass);
+
+			// set all the bone matrices!
+			Thor::Geometry* geom = gTiny->GetGeometry();
+
+			//pFX_Forward->SetMatrixArray( "BoneMatrixArray", (D3DXMATRIX*)geom->mBoneMatrices, geom->mNumBones );
+
+			{
+				D3DXMATRIXA16 matId;
+				D3DXMatrixIdentity( &matId );
+				D3DXMATRIXA16* mats = new D3DXMATRIXA16 [ geom->mNumBones ];
+				for(int x=0;x<geom->mNumBones;++x)
+					mats[x] = matId;
+				pFX_Forward->SetMatrixArray("BoneMatrixArray", mats, geom->mNumBones);
+				delete mats;
+			}
+
 
 			pFX_Forward->SetTexture( "DiffuseMap", skinTexture );
 			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
 			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[2]);
-			pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[2] );
+			//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[2] );
 			pFX_Forward->CommitChanges();
 			gTiny->Render();
-
-
 		pFX_Forward->EndPass();
+	}
+	pFX_Forward->End();
 
-		gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
 
-		// render 2D overlay
-		gui->Render(d3ddev);
-	};
 
 	d3ddev->EndScene();
 

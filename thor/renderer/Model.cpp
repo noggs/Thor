@@ -16,6 +16,8 @@ namespace bb
 		BIT_UV1			= 0x1,
 		BIT_NRM			= 0x2,
 		BIT_TAN			= 0x4,
+
+		BIT_SKIN		= 0x8,
 	};
 }
 
@@ -35,15 +37,35 @@ extern int gNumLocalMatrices;
 
 void CreateVertexDeclaration(int fmt, Thor::VertexDecl** declOut )
 {
-	D3DVERTEXELEMENT9 decl[] = {
-		{0, 0,  D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
-		{0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL,   0},
-		{0, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT,  0},
-		{0, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL, 0},
-		{0, 48, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
-		D3DDECL_END() };
+	HRESULT res;
+	if( (fmt & bb::BIT_SKIN) == 0 )
+	{
+		// static mesh vertex decl
+		D3DVERTEXELEMENT9 decl[] = {
+			{0, 0,  D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+			{0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL,   0},
+			{0, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT,  0},
+			{0, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL, 0},
+			{0, 48, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+			D3DDECL_END() };
 
-	d3ddev->CreateVertexDeclaration(decl, declOut);
+		res = d3ddev->CreateVertexDeclaration(decl, declOut);
+	}
+	else
+	{
+		// create skinned mesh stream
+		D3DVERTEXELEMENT9 decl[] = {
+			{0, 0,  D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,     0},
+			{0, 12, D3DDECLTYPE_UBYTE4,D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0},
+			{0, 16, D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDWEIGHT,  0},
+			{0, 20, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL,       0},
+			{0, 32, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT,      0},
+			{0, 44, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL,     0},
+			{0, 56, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD,     0},
+			D3DDECL_END() };
+
+		res = d3ddev->CreateVertexDeclaration(decl, declOut);
+	}
 }
 
 
@@ -88,12 +110,14 @@ void Model::LoadModel(const char* filename)
 			// no dx thingy for a TANGENT+BITANGENT
 			vertSize += sizeof(float) * 6;
 		}
-
+		if( fmt & bb::BIT_SKIN ) {
+			vertSize += 8;
+		}
 
 		// create vertex buffer
 		VertexBuffer* pVertexBuffer;
 		ret = d3ddev->CreateVertexBuffer(
-			numVerts * vertSize, D3DUSAGE_WRITEONLY, dxFormat, 
+			numVerts * vertSize, D3DUSAGE_WRITEONLY, 0, 
 			D3DPOOL_DEFAULT, &pVertexBuffer, NULL);
 
 		void* buffer;
@@ -122,6 +146,16 @@ void Model::LoadModel(const char* filename)
 			in.read( reinterpret_cast<char*>( buffer ), numFaces * 3 * sizeof(short) );
 		ret = pIndexBuffer->Unlock();
 
+		// load bones
+		unsigned int numBones=0;
+		float* boneArray = NULL;
+		if( fmt & bb::BIT_SKIN )
+		{
+			in.read( reinterpret_cast<char*>( &numBones ), sizeof(unsigned int) );
+			boneArray = new float[ numBones * 16 ];
+			in.read( reinterpret_cast<char*>( boneArray ), sizeof(float) * 16 * numBones );
+		}
+
 		// create vertex declaration
 
 		mGeometry = new Geometry();
@@ -132,6 +166,8 @@ void Model::LoadModel(const char* filename)
 		mGeometry->mNumVertices = numVerts;
 		mGeometry->mIndexBuffer = pIndexBuffer;
 		mGeometry->mNumIndices = numFaces;
+		mGeometry->mNumBones = numBones;
+		mGeometry->mBoneMatrices = boneArray;
 		CreateVertexDeclaration( fmt, &mGeometry->mVertexDecl );
 
 		mWorldTransformID = gNumWorldMatrices++;
@@ -155,7 +191,7 @@ void Model::Render()
 
 	// render the model
 	d3ddev->SetStreamSource(0, mGeometry->mVertexBuffer, 0, mGeometry->mVertexSize);
-	d3ddev->SetFVF( mGeometry->mVertexFormatDX );
+	//d3ddev->SetFVF( mGeometry->mVertexFormatDX );
 
 	if( mGeometry->mIndexBuffer ) {
 

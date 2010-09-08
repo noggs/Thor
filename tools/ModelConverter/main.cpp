@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 
+#include <vector>
 
 namespace bb 
 {
@@ -13,13 +14,35 @@ namespace bb
 		BIT_UV1			= 0x1,
 		BIT_NRM			= 0x2,
 		BIT_TAN			= 0x4,
+
+
+		BIT_SKIN		= 0x8,	// skinned mesh (contains BoneIndex and BoneWeight components (x4)
+
 	};
 
 }
 
 
+void PrintNodesRecursive(aiNode* node, int depth, int& nodeCount)
+{
+	char buf[256] = {0};
+	int i=0;
+	for(i=0; i<depth; ++i)
+		buf[i] = ' ';
+	printf( "NODE %02d: %s %s\n", ++nodeCount, buf, node->mName.data);
+
+	for(i=0; i<(int)node->mNumChildren; ++i)
+		PrintNodesRecursive(node->mChildren[i], depth+1, nodeCount);
+}
+
+
 void DoTheSceneProcessing( const aiScene* scene )
 {
+
+	// print out skeleton information
+	int nodeCount=0;
+	PrintNodesRecursive( scene->mRootNode, 0, nodeCount );
+
 
 	std::fstream out( "out.bbg", std::ios::out | std::ios::binary );
 
@@ -40,6 +63,37 @@ void DoTheSceneProcessing( const aiScene* scene )
 		const aiMesh* mesh = scene->mMeshes[iMesh];
 		if( aiPrimitiveType_TRIANGLE & mesh->mPrimitiveTypes )
 		{
+			// temporary arrays for skinning information
+			int* numWeights = new int[ mesh->mNumVertices ];		// number of bone weights per vertex
+			unsigned char* boneIDs = new unsigned char[ mesh->mNumVertices * 4 ];	// max of 4 bones per vertex
+			unsigned char* weights = new unsigned char[ mesh->mNumVertices * 4 ];	// max of 4 weights per vertex
+
+			memset( numWeights, 0, mesh->mNumVertices * sizeof(int) );
+			memset( boneIDs, 0, mesh->mNumVertices * 4 );
+			memset( weights, 0, mesh->mNumVertices * 4 );
+
+			// iterate over all the bones and create a map of vertex->boneIDs
+			for( unsigned int iBone = 0; iBone < mesh->mNumBones; ++iBone )
+			{
+				const aiBone* bone = mesh->mBones[iBone];
+				for( unsigned int iWeight = 0; iWeight < bone->mNumWeights; ++iWeight )
+				{
+					const aiVertexWeight* weight = &bone->mWeights[iWeight];
+
+					if( numWeights[ weight->mVertexId ] < 4 )
+					{
+						int nw = numWeights[ weight->mVertexId ];
+						boneIDs[ weight->mVertexId * 4 + nw ] = (unsigned char) iBone;
+						weights[ weight->mVertexId * 4 + nw ] = (unsigned char)( weight->mWeight * 255.0f );
+
+						++numWeights[ weight->mVertexId ];
+					}
+					//else
+					//	error - more than 4 weights per bone!
+
+				}
+			}
+
 			int fmt = 0;		// always has position
 			if( mesh->HasTextureCoords(0) )
 				fmt |= bb::BIT_UV1;
@@ -47,6 +101,9 @@ void DoTheSceneProcessing( const aiScene* scene )
 				fmt |= bb::BIT_NRM;
 			if( mesh->HasTangentsAndBitangents() )
 				fmt |= bb::BIT_TAN;
+			if( mesh->HasBones() )
+				fmt |= bb::BIT_SKIN;
+
 
 			// write the format def
 			out.write( (char*)&fmt, sizeof(int) );
@@ -59,6 +116,12 @@ void DoTheSceneProcessing( const aiScene* scene )
 			{
 				// position
 				out.write( (char*)&mesh->mVertices[iVert], sizeof(float) * 3 );
+
+				// bone indexes / weights
+				if( fmt & bb::BIT_SKIN ) {
+					out.write( (char*)&boneIDs[iVert * 4], 4 );
+					out.write( (char*)&weights[iVert * 4], 4 );
+				}
 
 				// normal
 				if( fmt & bb::BIT_NRM )	{
@@ -92,6 +155,19 @@ void DoTheSceneProcessing( const aiScene* scene )
 
 				out.write( (char*)&indices[0], sizeof(short) * 3 );
 			}
+
+			// now write out bone matrices
+			if( fmt & bb::BIT_SKIN ) {
+				out.write( (char*)&mesh->mNumBones, sizeof(unsigned int) );
+				for(unsigned int iBone=0; iBone<mesh->mNumBones; ++iBone)
+				{
+					out.write( (char*)&mesh->mBones[iBone]->mOffsetMatrix, sizeof(float) * 16 );	// write out 4x3 matrix to save space
+				}
+			}
+
+			delete numWeights;
+			delete boneIDs;
+			delete weights;
 		}
 	}
 
@@ -113,7 +189,8 @@ bool DoTheImportThing( const std::string& pFile)
         aiProcess_CalcTangentSpace       | 
         aiProcess_Triangulate            |
         aiProcess_JoinIdenticalVertices  |
-        aiProcess_SortByPType);
+        aiProcess_SortByPType            |
+		aiProcess_LimitBoneWeights         );
   
   // If the import failed, report it
   if( !scene)

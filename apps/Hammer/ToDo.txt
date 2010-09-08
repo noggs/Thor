@@ -13,7 +13,7 @@ Light pre-pass renderer
 4bI. Divide screen into tiles
 [DONE] 5. Switch to forward render and look-up into light buffer for lighting information
 6. Use linear depth instead of /w depth
-7. Implement straight multi-pass forward renderer for comparison
+[DONE] 7. Implement straight multi-pass forward renderer for comparison
 
 
 Divide screen into tiles
@@ -21,6 +21,15 @@ Transform light volumes into screenspace
 Sort tiles by number of lights
 For each tile group set technique, light info and render tiles
 
+
+
+Skinned mesh support
+	[DONE] Process skinned mesh and bone weights/matrices
+	[DONE] Display skinned mesh
+	Process and store skeleton information
+	Store animation data in seperate file
+	Load/playback animation
+	Animation blending
 
 
 Misc
