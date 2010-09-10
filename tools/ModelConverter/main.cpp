@@ -23,6 +23,94 @@ namespace bb
 }
 
 
+struct Node
+{
+	//Node() : mChildren(NULL), mSiblings(NULL) {}
+
+	// tree information
+	std::vector<Node*>	mChildren;
+
+	// node information
+	const aiNode*	mNode;
+
+};
+
+struct HierarchicalSkeleton
+{
+	Node* mRoot;
+};
+
+
+Node* RecurseChildren( const aiNode* node, const std::vector<aiString>& validnodes, Node* skeletonNode)
+{
+	if( find(validnodes.begin(), validnodes.end(), node->mName) != validnodes.end() )
+	{
+		// if this is a valid node, add to skeleton
+		Node* skelnode = new Node;
+		skelnode->mNode = node;
+		skeletonNode->mChildren.push_back( skelnode );
+
+		// check all children
+		for(unsigned int i=0; i<node->mNumChildren; ++i)
+		{
+			RecurseChildren( node->mChildren[i], validnodes, skelnode );
+		}
+	}
+
+	return skeletonNode;
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+// Given a mesh, will iterate over all the bones and find the aiNode that 
+// corresponds to each bone, and also all the parents up till we reach
+// the mesh node. This ensures nodes which have no bone in the mesh but 
+// are part of the hierarchy get added as well.
+void CreateSkeleton(const aiMesh* mesh, const aiScene* scene)
+{
+	std::vector<aiString> nodes;
+
+	unsigned int meshRootID;
+	for(meshRootID=0; meshRootID<scene->mNumMeshes; ++meshRootID)
+		if( scene->mMeshes[ meshRootID ] == mesh )
+			break;
+
+	for( unsigned int iBone = 0; iBone < mesh->mNumBones; ++iBone )
+	{
+		aiBone* bone = mesh->mBones[iBone];
+		aiNode* node = scene->mRootNode->FindNode( bone->mName );
+
+		while( node )
+		{
+			if(find(nodes.begin(), nodes.end(), node->mName)==nodes.end())
+				nodes.push_back( node->mName );
+
+			// is the mesh root node?
+			bool isMeshNode = std::find( &node->mMeshes[0], &node->mMeshes[node->mNumMeshes], meshRootID ) != &node->mMeshes[node->mNumMeshes];
+
+			// is the parent of the mesh root node?
+			//bool isMeshNodeParent = node->mNumChildren==1 && node->mChildren[0]->mNumMeshes==1 && node->mChildren[0]->mMeshes[0]==meshRootID;
+			bool isMeshNodeParent = node->mNumChildren==1 && std::find( &node->mChildren[0]->mMeshes[0], &node->mChildren[0]->mMeshes[ node->mChildren[0]->mNumMeshes ], meshRootID ) != &node->mChildren[0]->mMeshes[ node->mChildren[0]->mNumMeshes ];
+
+			if( isMeshNode || isMeshNodeParent )
+				break;
+			else
+				node = node->mParent;
+		}
+	}
+
+	// should have a list of nodes to include in the hierarchy so now recurse through the hierarchy adding nodes we find in our list
+	Node* ourRootNode = new Node;
+	RecurseChildren( scene->mRootNode, nodes, ourRootNode );
+
+	// now we have the full hierarchy in the skeleton, collapse the nodes that have
+	// no bones and a single child associated with them.
+
+
+
+}
+
+
 void PrintNodesRecursive(aiNode* node, int depth, int& nodeCount)
 {
 	char buf[256] = {0};
@@ -158,7 +246,26 @@ void DoTheSceneProcessing( const aiScene* scene )
 
 			// now write out bone matrices
 			if( fmt & bb::BIT_SKIN ) {
+
+				//////////////////////////////////////////////////////////////////////////
+				// a) Create a map or a similar container to store which nodes are necessary for the skeleton. Pre-initialise it for all nodes with a "no". 
+				// b) For each bone in the mesh: 
+				// b1) Find the corresponding node in the scene's hierarchy by comparing their names. 
+				// b2) Mark this node as "yes" in the necessityMap. 
+				// b3) Mark all of its parents the same way until you 1) find the mesh's node or 2) the parent of the mesh's node. 
+				// c) Recursively iterate over the node hierarchy 
+				// c1) If the node is marked as necessary, copy it into the skeleton and check its children 
+				// c2) If the node is marked as not necessary, skip it and do not iterate over its children. 
+				// 
+
+				CreateSkeleton( mesh, scene );
+
+
 				out.write( (char*)&mesh->mNumBones, sizeof(unsigned int) );
+
+
+
+
 				for(unsigned int iBone=0; iBone<mesh->mNumBones; ++iBone)
 				{
 					out.write( (char*)&mesh->mBones[iBone]->mOffsetMatrix, sizeof(float) * 16 );	// write out 4x3 matrix to save space

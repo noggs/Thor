@@ -4,6 +4,32 @@
 namespace Thor
 {
 
+
+	class Skeleton
+	{
+	public:
+		static const unsigned int MaxBones = 64;
+		static const unsigned int MaxHierachy = 16;
+
+		Matrix	mLocalOffset[ MaxBones ];		// local offset of this bone (constant) should be a pointer to geometry maybe?
+
+		Matrix	mLocalTransform[ MaxBones ];	// local transform of this bone (from animation)
+		Matrix	mCombined[ MaxBones ];			// model space transform of this bone (multiplied down from parents)
+
+		//////////////////////////////////////////////////////////////////////////
+		// given a hierarchy like this:
+		//   pelvis
+		//     spine                    legL      legR
+		//       neck   shoulderL         calfL     calfR
+		//
+		// looks like this in flat hierarchy:
+		//   pelvis | spine | legL | legR | neck | calfL | calfR
+		//
+
+		int		mNumBonesAtEachLevel[ MaxHierachy ];
+	};
+
+
 	class Texture
 	{
 	public:
