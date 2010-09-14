@@ -20,7 +20,7 @@
 			OutputDirectory="../../lib/$(ConfigurationName)"
 			IntermediateDirectory="..\..\obj\$(ProjectName)\$(ConfigurationName)"
 			ConfigurationType="4"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -44,6 +44,8 @@
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
+				EnableEnhancedInstructionSet="2"
+				FloatingPointModel="2"
 				WarningLevel="3"
 				DebugInformationFormat="4"
 			/>
@@ -81,7 +83,7 @@
 			OutputDirectory="..\..\lib\$(ConfigurationName)"
 			IntermediateDirectory="..\..\obj\$(ProjectName)\$(ConfigurationName)"
 			ConfigurationType="4"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -190,6 +192,14 @@
 			Name="core"
 			>
 			<File
+				RelativePath="..\..\core\Core.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\core\Core.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\core\Mutex.cpp"
 				>
 			</File>
@@ -198,7 +208,31 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\core\Profiler.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\core\Profiler.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\core\Thread.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\core\Types.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="fx"
+			>
+			<File
+				RelativePath="..\..\fx\SimpleFX.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\fx\SimpleFX.h"
 				>
 			</File>
 		</Filter>

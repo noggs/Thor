@@ -10,6 +10,8 @@
 
 #include <core/Mutex.h>
 #include <core/Thread.h>
+#include <core/Profiler.h>
+#include <fx/SimpleFX.h>
 
 static const float PI = 3.1415f;
 
@@ -136,7 +138,8 @@ int WINAPI WinMain(HINSTANCE hInstance,
         render_frame();
 
 		UpdateFPS();
-    }
+
+	}
 
     // clean up DirectX and COM
     cleanD3D();
@@ -206,6 +209,7 @@ LPDIRECT3DSURFACE9 pGBufferSurface = NULL, pLightBufferSurface = NULL, pBackBuff
 LPDIRECT3DSURFACE9 pZBuffer = NULL;
 
 Thor::Gui* gui = NULL;
+Thor::SimpleFX* fx = NULL;
 
 struct Camera
 {
@@ -251,11 +255,18 @@ void initD3D(HWND hWnd)
 	d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
 	d3dpp.MultiSampleQuality = 0;
 
+	DWORD behaviourFlags=0;
+	//if (caps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT)
+	//	behaviourFlags |= D3DCREATE_HARDWARE_VERTEXPROCESSING;
+	//else
+		behaviourFlags |= D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+	//behaviourFlags |= D3DCREATE_MIXED_VERTEXPROCESSING;
+
     // create a device class using this information and information from the d3dpp stuct
     result = d3d->CreateDevice(	D3DADAPTER_DEFAULT,
 								D3DDEVTYPE_HAL,
 								hWnd,
-								D3DCREATE_SOFTWARE_VERTEXPROCESSING,
+								behaviourFlags,
 								&d3dpp,
 								&d3ddev);
 
@@ -269,6 +280,8 @@ void initD3D(HWND hWnd)
 	d3ddev->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
 
 	gui = new Thor::Gui(d3ddev);
+
+	fx = new Thor::SimpleFX( d3ddev );
 
 	LPD3DXBUFFER errors = NULL;
 
@@ -531,6 +544,9 @@ static float gAngle = 0.0f;
 // this is the function used to render a single frame
 void render_frame(void)
 {
+	Thor::Profiler::Instance()->BeginFrame();
+
+
 	if(duckTexture==NULL)
 	{
 		duckTexture = LoadTexture("duckCM.png");
@@ -544,8 +560,16 @@ void render_frame(void)
 		skinTexture = LoadTexture("Tiny_skin.dds");
 	}
 
+	D3DXMATRIXA16 matArrayWorldView[10];
+	D3DXMATRIXA16 matArrayWorldViewProj[10];
+	D3DXMATRIXA16 matArrayInvWorldView[10];
+	D3DXMATRIXA16 matWorld, matView, matProj, matInvProj;
+
+
 	// update scene
 	{
+		Thor::ProfileScope prof("Update Scene");
+
 		gAngle += 0.01f;
 
 		///
@@ -570,223 +594,227 @@ void render_frame(void)
 		mat._42 = skinHeight;
 		gTiny->SetLocalMatrix( mat );
 
+
+		//gModel->Update();
+		//gPlane->Update();
+		//gTiny->Update();
+
+		// update camera
+
+
+		{
+			Thor::ProfileScope prof("TransformAllMatrices");
+
+			Thor::Matrix identity;
+			//Thor::MtxIdentity( identity );
+			D3DXMatrixIdentity( &identity );
+			TransformAllMatrices(0, gNumWorldMatrices, identity);
+
+			// set view parameters (World, View and Proj matrices)
+			FlyCam(0.066f);
+			SetupCamera();
+
+			// get matrices
+			d3ddev->GetTransform(D3DTS_WORLD, &matWorld);
+			d3ddev->GetTransform(D3DTS_VIEW, &matView);
+			d3ddev->GetTransform(D3DTS_PROJECTION, &matProj);
+
+
+			// calculate all WorldView and WorldViewProj matrices now on CPU...
+
+			int i;
+			for(i=0; i<gNumWorldMatrices; ++i)
+			{
+				matArrayWorldView[i] = gWorldMatrices[i] * matView;
+				matArrayWorldViewProj[i] = gWorldMatrices[i] * matView * matProj;
+				D3DXMatrixInverse( &matArrayInvWorldView[i], NULL, &matArrayWorldView[i] );
+			}
+
+			D3DXMatrixInverse( &matInvProj, NULL, &matProj );
+		}
 	}
 
-
-	//gModel->Update();
-	//gPlane->Update();
-	//gTiny->Update();
-
-	// update camera
-
-
-
-	Thor::Matrix identity;
-	//Thor::MtxIdentity( identity );
-	D3DXMatrixIdentity( &identity );
-	TransformAllMatrices(0, gNumWorldMatrices, identity);
-
-	// set view parameters (World, View and Proj matrices)
-	FlyCam(0.066f);
-	SetupCamera();
-
-	// get matrices
-    D3DXMATRIXA16 matWorld, matView, matProj;
-    d3ddev->GetTransform(D3DTS_WORLD, &matWorld);
-    d3ddev->GetTransform(D3DTS_VIEW, &matView);
-    d3ddev->GetTransform(D3DTS_PROJECTION, &matProj);
-
-
-	// calculate all WorldView and WorldViewProj matrices now on CPU...
-	D3DXMATRIXA16 matArrayWorldView[10];
-	D3DXMATRIXA16 matArrayWorldViewProj[10];
-	D3DXMATRIXA16 matArrayInvWorldView[10];
-
-	int i;
-	for(i=0; i<gNumWorldMatrices; ++i)
-	{
-		matArrayWorldView[i] = gWorldMatrices[i] * matView;
-		matArrayWorldViewProj[i] = gWorldMatrices[i] * matView * matProj;
-		D3DXMatrixInverse( &matArrayInvWorldView[i], NULL, &matArrayWorldView[i] );
-	}
-
-	D3DXMATRIXA16 matInvProj;
-	D3DXMatrixInverse( &matInvProj, NULL, &matProj );
-
+	UINT cPasses, iPass;
+	float gbufferSize[] = {(float)gRTRes[0], (float)gRTRes[1] };
 
 	////////////////////
 	// Step 1 - render the scene into GBuffer storing normals and depth
-
-	// grab the back buffer
-	d3ddev->GetRenderTarget(0, &pBackBuffer);
-
-	// set G buffer rt
-	d3ddev->SetRenderTarget(0, pGBufferSurface);
-	// clear the rt
-	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL, 
-					D3DCOLOR_RGBA(0, 0, 0, 0), 1.0f, 0);
-
-	d3ddev->BeginScene();
-
-	// setup shader constants
-	pFX_GBuffer->SetFloat( "FarClip", gFarClip );
-	pFX_GBuffer->SetTexture( "NormalMap", duckNrmTexture );
-	pFX_GBuffer->CommitChanges();
-
-	// Apply the technique contained in the effect 
-	UINT cPasses, iPass;
-	pFX_GBuffer->Begin(&cPasses, 0);
-
-	for (iPass = 0; iPass < cPasses; iPass++)
 	{
-		pFX_GBuffer->BeginPass(iPass);
+		Thor::ProfileScope prof("Render GBuffer");
 
-		pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0]);
-		pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[0]);
+		// grab the back buffer
+		d3ddev->GetRenderTarget(0, &pBackBuffer);
+
+		// set G buffer rt
+		d3ddev->SetRenderTarget(0, pGBufferSurface);
+		// clear the rt
+		d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL, 
+						D3DCOLOR_RGBA(0, 0, 0, 0), 1.0f, 0);
+
+		d3ddev->BeginScene();
+
+		// setup shader constants
+		pFX_GBuffer->SetFloat( "FarClip", gFarClip );
+		pFX_GBuffer->SetTexture( "NormalMap", duckNrmTexture );
 		pFX_GBuffer->CommitChanges();
-		gModel->Render();
 
-		pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1]);
-		pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[1]);
-		pFX_GBuffer->CommitChanges();
-		gPlane->Render();
+		// Apply the technique contained in the effect 
+		pFX_GBuffer->Begin(&cPasses, 0);
 
-		pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
-		pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[2]);
-		pFX_GBuffer->CommitChanges();
-		gTiny->Render();
+		for (iPass = 0; iPass < cPasses; iPass++)
+		{
+			pFX_GBuffer->BeginPass(iPass);
 
-		pFX_GBuffer->EndPass();
+			pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0]);
+			pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[0]);
+			pFX_GBuffer->CommitChanges();
+			gModel->Render();
+
+			pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1]);
+			pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[1]);
+			pFX_GBuffer->CommitChanges();
+			gPlane->Render();
+
+			pFX_GBuffer->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
+			pFX_GBuffer->SetMatrix( "WorldView", &matArrayWorldView[2]);
+			pFX_GBuffer->CommitChanges();
+			gTiny->Render();
+
+			pFX_GBuffer->EndPass();
+		}
+		pFX_GBuffer->End();
+
+		d3ddev->EndScene();
 	}
-	pFX_GBuffer->End();
-
-	d3ddev->EndScene();
 
 
 	/////////////////////
 	// Step 2 - render the lighting into the light buffer sampling the GBuffer
-
-	// set lighting buffer rt
-	d3ddev->SetRenderTarget(0, pLightBufferSurface);
-	// clear the rt
-	d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
-//					D3DCOLOR_RGBA(255, 255, 255, 255), 1.0f, 0);
-					D3DCOLOR_RGBA(0, 0, 0, 0), 1.0f, 0);
-
-	d3ddev->BeginScene();
-
-	pFX_Lighting->SetMatrix( "InvProj", &matInvProj );
-	pFX_Lighting->SetFloat( "FarClip", gFarClip );
-
-	
-	float gbufferSize[] = {(float)gRTRes[0], (float)gRTRes[1] };
-	//float gbufferSize[] = {256.0f, 256.0f };
-	pFX_Lighting->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
-
-	
-	// transform directional light vector into view space
 	{
-		D3DXVECTOR4 lightDir( gDirLightPos.GetX(), gDirLightPos.GetY(), gDirLightPos.GetZ(), gDirLightPos.GetW() );
-		D3DXVec4Transform( &lightDir, &lightDir, &matView );
-		pFX_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
-		pFX_Forward->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
-	}
+		Thor::ProfileScope prof("Render Lighting");
 
-
-	//////////////////////////////////////////////////////////////////////////
-	// Render directional/ambient first
-
-	pFX_Lighting->SetTechnique("DirectionalLight");
-
-	pFX_Lighting->SetFloatArray( "LightColourDif", &gDirLightColour[0], 3 );
-	pFX_Forward->SetFloatArray( "LightColourDifDir", &gDirLightColour[0], 3 );
-
-#if 1
-	// Apply the technique contained in the effect 
-	pFX_Lighting->Begin(&cPasses, 0);
-
-	for (iPass = 0; iPass < cPasses; iPass++)
-	{
-		pFX_Lighting->BeginPass(iPass);
-
-		// Render a full screen quad for the directional light pass
-		// use Gui system!
-		gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
-		gui->RenderUsingCurrentFX(d3ddev);
-
-		pFX_Lighting->EndPass();
-	}
-	pFX_Lighting->End();
-#endif
-
-	d3ddev->EndScene();
-
-	//////////////////////////////////////////////////////////////////////////
-	// Now render all the point lights
-
-	if( gPointLightsNum > 0 )
-	{
-
-		// Setup lighting parameters
-		{
-			const int MaxLights = 8;
-			D3DXVECTOR3 lightPos[MaxLights];
-			float lightColour[3*MaxLights];
-			float lightRadius[MaxLights];
-
-			int i;
-			for(i=0; i<gPointLightsNum && i<MaxLights; ++i)
-			{
-				const Light& light = gPointLights[i];
-
-				// transform pos into view space
-				D3DXVECTOR4 tempPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), 1.0f );
-				D3DXVECTOR4 xformPos;
-				D3DXVec4Transform( &xformPos, &tempPos, &matView );
-
-				lightPos[i] = D3DXVECTOR3(xformPos.x, xformPos.y, xformPos.z);
-
-				lightColour[0 + (i*3)] = light.colour[0];
-				lightColour[1 + (i*3)] = light.colour[1];
-				lightColour[2 + (i*3)] = light.colour[2];
-
-				lightRadius[i] = light.radius;
-			}
-
-			pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
-			pFX_Lighting->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
-			pFX_Lighting->SetFloatArray( "LightRadius", &lightRadius[0], i );
-			pFX_Lighting->SetInt( "CurNumLights", gPointLightsNum-1 );
-			pFX_Lighting->CommitChanges();
-
-			pFX_Forward->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
-			pFX_Forward->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
-			pFX_Forward->SetFloatArray( "LightRadius", &lightRadius[0], i );
-			pFX_Forward->SetInt( "CurNumLights", gPointLightsNum-1 );
-			pFX_Forward->CommitChanges();
-		}
-
-
-		pFX_Lighting->SetTechnique("PointLight");
+		// set lighting buffer rt
+		d3ddev->SetRenderTarget(0, pLightBufferSurface);
+		// clear the rt
+		d3ddev->Clear(	0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 
+	//					D3DCOLOR_RGBA(255, 255, 255, 255), 1.0f, 0);
+						D3DCOLOR_RGBA(0, 0, 0, 0), 1.0f, 0);
 
 		d3ddev->BeginScene();
 
+		pFX_Lighting->SetMatrix( "InvProj", &matInvProj );
+		pFX_Lighting->SetFloat( "FarClip", gFarClip );
+
+		
+		//float gbufferSize[] = {256.0f, 256.0f };
+		pFX_Lighting->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
+
+		
+		// transform directional light vector into view space
+		{
+			D3DXVECTOR4 lightDir( gDirLightPos.GetX(), gDirLightPos.GetY(), gDirLightPos.GetZ(), gDirLightPos.GetW() );
+			D3DXVec4Transform( &lightDir, &lightDir, &matView );
+			pFX_Lighting->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
+			pFX_Forward->SetFloatArray( "LightDirVS", (FLOAT*)&lightDir, 3 );
+		}
+
+
+		//////////////////////////////////////////////////////////////////////////
+		// Render directional/ambient first
+
+		pFX_Lighting->SetTechnique("DirectionalLight");
+
+		pFX_Lighting->SetFloatArray( "LightColourDif", &gDirLightColour[0], 3 );
+		pFX_Forward->SetFloatArray( "LightColourDifDir", &gDirLightColour[0], 3 );
+
+	#if 1
 		// Apply the technique contained in the effect 
 		pFX_Lighting->Begin(&cPasses, 0);
+
 		for (iPass = 0; iPass < cPasses; iPass++)
 		{
 			pFX_Lighting->BeginPass(iPass);
 
-				// Render a full screen quad for the light - room for improvement here :)
-				gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
-				gui->RenderUsingCurrentFX(d3ddev);
+			// Render a full screen quad for the directional light pass
+			// use Gui system!
+			gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
+			gui->RenderUsingCurrentFX(d3ddev);
 
 			pFX_Lighting->EndPass();
 		}
 		pFX_Lighting->End();
+	#endif
 
 		d3ddev->EndScene();
 
+		//////////////////////////////////////////////////////////////////////////
+		// Now render all the point lights
+
+		if( gPointLightsNum > 0 )
+		{
+			Thor::ProfileScope prof("Point lights");
+
+			// Setup lighting parameters
+			{
+				const int MaxLights = 8;
+				D3DXVECTOR3 lightPos[MaxLights];
+				float lightColour[3*MaxLights];
+				float lightRadius[MaxLights];
+
+				int i;
+				for(i=0; i<gPointLightsNum && i<MaxLights; ++i)
+				{
+					const Light& light = gPointLights[i];
+
+					// transform pos into view space
+					D3DXVECTOR4 tempPos( light.pos.GetX(), light.pos.GetY(), light.pos.GetZ(), 1.0f );
+					D3DXVECTOR4 xformPos;
+					D3DXVec4Transform( &xformPos, &tempPos, &matView );
+
+					lightPos[i] = D3DXVECTOR3(xformPos.x, xformPos.y, xformPos.z);
+
+					lightColour[0 + (i*3)] = light.colour[0];
+					lightColour[1 + (i*3)] = light.colour[1];
+					lightColour[2 + (i*3)] = light.colour[2];
+
+					lightRadius[i] = light.radius;
+				}
+
+				pFX_Lighting->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
+				pFX_Lighting->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
+				pFX_Lighting->SetFloatArray( "LightRadius", &lightRadius[0], i );
+				pFX_Lighting->SetInt( "CurNumLights", gPointLightsNum-1 );
+				pFX_Lighting->CommitChanges();
+
+				pFX_Forward->SetFloatArray( "LightPosVS", (FLOAT*)&lightPos[0], 3*i );
+				pFX_Forward->SetFloatArray( "LightColourDif", &lightColour[0], 3*i );
+				pFX_Forward->SetFloatArray( "LightRadius", &lightRadius[0], i );
+				pFX_Forward->SetInt( "CurNumLights", gPointLightsNum-1 );
+				pFX_Forward->CommitChanges();
+			}
+
+
+			pFX_Lighting->SetTechnique("PointLight");
+
+			d3ddev->BeginScene();
+
+			// Apply the technique contained in the effect 
+			pFX_Lighting->Begin(&cPasses, 0);
+			for (iPass = 0; iPass < cPasses; iPass++)
+			{
+				pFX_Lighting->BeginPass(iPass);
+
+					// Render a full screen quad for the light - room for improvement here :)
+					gui->DrawTexturedRect(0, 0, gRTRes[0], gRTRes[1], pGBufferTexture );
+					gui->RenderUsingCurrentFX(d3ddev);
+
+				pFX_Lighting->EndPass();
+			}
+			pFX_Lighting->End();
+
+			d3ddev->EndScene();
+
+		}
 	}
 
 
@@ -802,121 +830,136 @@ void render_frame(void)
 
 	if( keys['F'] )
 	{
+		Thor::ProfileScope prof("Render Scene Deferred");
 
-	d3ddev->BeginScene();    // begins the 3D scene
+		d3ddev->BeginScene();    // begins the 3D scene
 
-		pFX_Model->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
-		pFX_Model->SetTexture( "LightBufferTexture", pLightBufferTexture );
-		pFX_Model->CommitChanges();
-
-		pFX_Model->Begin(&cPasses, 0);
-			pFX_Model->BeginPass(0);
-
-			pFX_Model->SetTexture( "DiffuseMap", duckTexture );
-			pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0] );
+			pFX_Model->SetFloatArray( "GBufferSize", &gbufferSize[0], 2 );
+			pFX_Model->SetTexture( "LightBufferTexture", pLightBufferTexture );
 			pFX_Model->CommitChanges();
-			gModel->Render();
 
-			pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1] );
-			pFX_Model->CommitChanges();
-			gPlane->Render();
+			pFX_Model->Begin(&cPasses, 0);
+				pFX_Model->BeginPass(0);
 
-			pFX_Model->SetTexture( "DiffuseMap", skinTexture );
-			pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
-			pFX_Model->CommitChanges();
-			gTiny->Render();
+				pFX_Model->SetTexture( "DiffuseMap", duckTexture );
+				pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0] );
+				pFX_Model->CommitChanges();
+				gModel->Render();
 
-			pFX_Model->EndPass();
-		pFX_Model->End();
+				pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1] );
+				pFX_Model->CommitChanges();
+				gPlane->Render();
 
-		gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
-		gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
+				pFX_Model->SetTexture( "DiffuseMap", skinTexture );
+				pFX_Model->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
+				pFX_Model->CommitChanges();
+				gTiny->Render();
 
-		// render 2D overlay
-		gui->Render(d3ddev);
+				pFX_Model->EndPass();
+			pFX_Model->End();
+
+			gui->DrawTexturedRect(0, 0, 256, 256, pGBufferTexture );
+			gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
+
+			// render 2D overlay
+			gui->Render(d3ddev);
 
 
-	d3ddev->EndScene();
+		d3ddev->EndScene();
 
 
 	} else {
 
+		Thor::ProfileScope prof("Render Scene Forward");
 
 
-	
-	pFX_Forward->CommitChanges();
+		
+		pFX_Forward->CommitChanges();
 
-	d3ddev->BeginScene();
+		d3ddev->BeginScene();
 
-	pFX_Forward->SetTechnique("DirPointLights");
-	pFX_Forward->Begin(&cPasses, 0);
-	for (iPass = 0; iPass < cPasses; iPass++)
+		pFX_Forward->SetTechnique("DirPointLights");
+		pFX_Forward->Begin(&cPasses, 0);
+		for (iPass = 0; iPass < cPasses; iPass++)
+		{
+			pFX_Forward->BeginPass(iPass);
+
+				pFX_Forward->SetTexture( "NormalMap", duckNrmTexture );
+				pFX_Forward->SetTexture( "DiffuseMap", duckTexture );
+				pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0]);
+				pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[0]);
+				//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[0] );
+				pFX_Forward->CommitChanges();
+				gModel->Render();
+
+				pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1]);
+				pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[1]);
+				//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[1] );
+				pFX_Forward->CommitChanges();
+				gPlane->Render();
+
+			pFX_Forward->EndPass();
+
+			//gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
+
+			// render 2D overlay
+			gui->Render(d3ddev);
+		}
+		pFX_Forward->End();
+
+
+		pFX_Forward->SetTechnique("DirPointLights_Skin");
+		pFX_Forward->Begin(&cPasses, 0);
+		for (iPass = 0; iPass < cPasses; iPass++)
+		{
+			pFX_Forward->BeginPass(iPass);
+
+				// set all the bone matrices!
+				Thor::Geometry* geom = gTiny->GetGeometry();
+
+				//pFX_Forward->SetMatrixArray( "BoneMatrixArray", (D3DXMATRIX*)geom->mBoneMatrices, geom->mNumBones );
+
+				{
+					D3DXMATRIXA16 matId;
+					D3DXMatrixIdentity( &matId );
+					D3DXMATRIXA16* mats = new D3DXMATRIXA16 [ geom->mNumBones ];
+					for(int x=0;x<geom->mNumBones;++x)
+						mats[x] = matId;
+					pFX_Forward->SetMatrixArray("BoneMatrixArray", mats, geom->mNumBones);
+					delete mats;
+				}
+
+
+				pFX_Forward->SetTexture( "DiffuseMap", skinTexture );
+				pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
+				pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[2]);
+				//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[2] );
+				pFX_Forward->CommitChanges();
+				gTiny->Render();
+			pFX_Forward->EndPass();
+		}
+		pFX_Forward->End();
+
+
+
+		d3ddev->EndScene();
+
+	}
+
 	{
-		pFX_Forward->BeginPass(iPass);
-
-			pFX_Forward->SetTexture( "NormalMap", duckNrmTexture );
-			pFX_Forward->SetTexture( "DiffuseMap", duckTexture );
-			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[0]);
-			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[0]);
-			//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[0] );
-			pFX_Forward->CommitChanges();
-			gModel->Render();
-
-			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[1]);
-			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[1]);
-			//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[1] );
-			pFX_Forward->CommitChanges();
-			gPlane->Render();
-
-		pFX_Forward->EndPass();
-
-		//gui->DrawTexturedRect(0, 256, 256, 256, pLightBufferTexture );
-
-		// render 2D overlay
-		gui->Render(d3ddev);
-	}
-	pFX_Forward->End();
-
-
-	pFX_Forward->SetTechnique("DirPointLights_Skin");
-	pFX_Forward->Begin(&cPasses, 0);
-	for (iPass = 0; iPass < cPasses; iPass++)
-	{
-		pFX_Forward->BeginPass(iPass);
-
-			// set all the bone matrices!
-			Thor::Geometry* geom = gTiny->GetGeometry();
-
-			//pFX_Forward->SetMatrixArray( "BoneMatrixArray", (D3DXMATRIX*)geom->mBoneMatrices, geom->mNumBones );
-
-			{
-				D3DXMATRIXA16 matId;
-				D3DXMatrixIdentity( &matId );
-				D3DXMATRIXA16* mats = new D3DXMATRIXA16 [ geom->mNumBones ];
-				for(int x=0;x<geom->mNumBones;++x)
-					mats[x] = matId;
-				pFX_Forward->SetMatrixArray("BoneMatrixArray", mats, geom->mNumBones);
-				delete mats;
-			}
-
-
-			pFX_Forward->SetTexture( "DiffuseMap", skinTexture );
-			pFX_Forward->SetMatrix( "WorldViewProj", &matArrayWorldViewProj[2]);
-			pFX_Forward->SetMatrix( "WorldView", &matArrayWorldView[2]);
-			//pFX_Forward->SetMatrix( "InvWorldView", &matArrayInvWorldView[2] );
-			pFX_Forward->CommitChanges();
-			gTiny->Render();
-		pFX_Forward->EndPass();
-	}
-	pFX_Forward->End();
-
-
-
-	d3ddev->EndScene();
-
+		{
+			Thor::ProfileScope prof("FX Update");
+			fx->Update();
+		}
+		{
+			Thor::ProfileScope prof("FX Render");
+			fx->Render( d3ddev );
+		}
 	}
 
 
+	Thor::Profiler::Instance()->EndFrame();
+	Thor::Profiler::Instance()->ShowStats();
 
 	d3ddev->Present(NULL, NULL, NULL, NULL);    // displays the created frame
 

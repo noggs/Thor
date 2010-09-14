@@ -1,8 +1,18 @@
 #ifndef RENDERER_H_INCLUDED
 #define RENDERER_H_INCLUDED
 
+#include <d3d9.h>
+#include <math/Matrix.h>
+
+
 namespace Thor
 {
+
+	// for now!
+	typedef IDirect3DVertexBuffer9 VertexBuffer;
+	typedef IDirect3DIndexBuffer9 IndexBuffer;
+	typedef IDirect3DVertexDeclaration9 VertexDecl; 
+
 
 
 	class Skeleton
@@ -34,7 +44,7 @@ namespace Thor
 	{
 	public:
 	private:
-		std::string			mName;	// always handy for debug
+		//std::string			mName;	// always handy for debug
 		IDirect3DTexture9*	mTexture;
 	};
 
@@ -49,7 +59,7 @@ namespace Thor
 	{
 	public:
 	private:
-		std::string		mName;	// always handy for debug
+		//std::string		mName;	// always handy for debug
 		ID3DXEffect*	mEffect;
 		Texture*		mTextures[4];	// upto 4 texture stages
 		UINT			mNumTextures;
@@ -115,21 +125,6 @@ namespace Thor
 	};
 
 
-	class Scene
-	{
-	public:
-
-		void AddModel(Model* );
-
-		void Update(float t);
-
-	private:
-		Model*	mModels[32];
-		int		mNumModels;
-
-		PointLight	mPointLights[32];
-		int			mNumPointLights;
-	};
 
 
 	class Renderer
@@ -144,8 +139,6 @@ namespace Thor
 
 	private:
 
-		Scene*			mScene;
-
 		enum RTType { RT_BACKBUFFER, RT_GBUFFER, RT_LIGHTBUFFER, RT_NUM };
 		RenderTarget*	mRenderTargets[RT_NUM];
 
@@ -154,7 +147,7 @@ namespace Thor
 	};
 
 
-	Renderer*	RendererInstance;	// global variable \o/
+	//Renderer*	RendererInstance;	// global variable \o/
 }
 
 #endif

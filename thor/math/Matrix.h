@@ -1,6 +1,7 @@
 #ifndef MATRIX_H_INCLUDED
 #define MATRIX_H_INCLUDED
 
+#include <d3dx9.h>
 #include <xmmintrin.h>
 #include <math/Vector.h>
 

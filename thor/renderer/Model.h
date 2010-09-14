@@ -5,13 +5,9 @@
 #include <d3dx9math.h>
 #include <string>
 #include <math/Matrix.h>
+#include <renderer/Renderer.h>
 
 namespace Thor {
-
-	// for now!
-	typedef IDirect3DVertexBuffer9 VertexBuffer;
-	typedef IDirect3DIndexBuffer9 IndexBuffer;
-	typedef IDirect3DVertexDeclaration9 VertexDecl; 
 
 	struct Geometry
 	{

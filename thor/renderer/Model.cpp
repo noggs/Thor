@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include <math/Vector.h>
+#include <core/Core.h>
 
 using namespace Thor;
 
@@ -152,6 +153,7 @@ void Model::LoadModel(const char* filename)
 		if( fmt & bb::BIT_SKIN )
 		{
 			in.read( reinterpret_cast<char*>( &numBones ), sizeof(unsigned int) );
+			thorAssertNoMessage(numBones>0);
 			boneArray = new float[ numBones * 16 ];
 			in.read( reinterpret_cast<char*>( boneArray ), sizeof(float) * 16 * numBones );
 		}
@@ -192,10 +194,9 @@ void Model::Render()
 	// render the model
 	d3ddev->SetStreamSource(0, mGeometry->mVertexBuffer, 0, mGeometry->mVertexSize);
 	//d3ddev->SetFVF( mGeometry->mVertexFormatDX );
+	ret = d3ddev->SetVertexDeclaration( mGeometry->mVertexDecl );
 
 	if( mGeometry->mIndexBuffer ) {
-
-		ret = d3ddev->SetVertexDeclaration( mGeometry->mVertexDecl );
 
 		ret = d3ddev->SetIndices( mGeometry->mIndexBuffer );
 		ret = d3ddev->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 
@@ -203,7 +204,7 @@ void Model::Render()
 			0, mGeometry->mNumIndices );
 	}
 	else
-		ret = d3ddev->DrawPrimitive(D3DPT_TRIANGLELIST, 0, mGeometry->mNumVertices);
+		ret = d3ddev->DrawPrimitive(D3DPT_POINTLIST, 0, mGeometry->mNumVertices);
 }
 
 
