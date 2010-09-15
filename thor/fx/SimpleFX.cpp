@@ -14,7 +14,7 @@ namespace Thor
 	SimpleFX::SimpleFX(IDirect3DDevice9 * d3ddev)
 	{
 		HRESULT ret;
-		int numParticles = 1;
+		int numParticles = 100;
 		mNumParticles = numParticles;
 
 		// create particle data arrays and zero them
@@ -91,7 +91,7 @@ namespace Thor
 		// update velocity and age
 		for(i=0; i<numParticles; ++i)
 		{
-			//mParticleVel[i] += gravVel;
+			mParticleVel[i] += gravVel;
 			mParticleAge[i] += ft;
 		}
 
@@ -129,11 +129,11 @@ namespace Thor
 			if(mSpawn[i])
 			{
 				mParticlePos[i] = Vec4(0.0f, 2.0f, 0.0f, 1.0f);
-				//mParticleVel[i] = Vec4(0.0f, 5.0f, 0.0f, 0.0f) + (RandUnitVec4() * Vec4(1.0f, 0.0f, 1.0f, 0.0f));
-				mParticleVel[i] = Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+				mParticleVel[i] = Vec4(0.0f, 5.0f, 0.0f, 0.0f) + (RandUnitVec4() * Vec4(1.0f, 0.0f, 1.0f, 0.0f));
+				//mParticleVel[i] = Vec4(0.0f, 0.0f, 0.0f, 0.0f);
 				mParticleAge[i] = 0.0f;
-				//mParticleLife[i] = 1.0f + RandNormalFloat();
-				mParticleLife[i] = 10000.0f;
+				mParticleLife[i] = 1.0f + RandNormalFloat();
+				//mParticleLife[i] = 10000.0f;
 			}
 		}
 
@@ -163,6 +163,9 @@ namespace Thor
 		mFX->SetMatrix( "View", &matView );
 		mFX->SetTexture( "DiffuseMap", mParticleTex );
 		mFX->SetTexture( "GBufferTexture", pGBufferTexture );
+
+		float vpDims[] = {800.0f, 600.0f};
+		mFX->SetFloatArray( "ViewportDimensions", &vpDims[0], 2 );
 
 		d3ddev->BeginScene();
 

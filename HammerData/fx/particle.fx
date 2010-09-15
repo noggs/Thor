@@ -9,6 +9,7 @@
 float4x4 ViewProj;		// matrix from ObjectSpace to ClipSpace
 float4x4 View;			// matrix from ObjectSpace to CameraSpace
 float2   GBufferSize;	// dimensions of GBuffer texture
+float2   ViewportDimensions;	// screen dimensions of rendertarget
 
 // diffuse colour map
 texture DiffuseMap;
@@ -91,7 +92,7 @@ VS_OUTPUT_SOFT vs_soft( float4 pos : POSITION0, float4 color : COLOR0)
 		float distSq = (eyeSpacePos.x*eyeSpacePos.x + eyeSpacePos.y*eyeSpacePos.y + eyeSpacePos.z*eyeSpacePos.z);
 		float dist = sqrt(distSq);
 		
-		const float Vh = 600;
+		const float Vh = ViewportDimensions.y;
 		const float Si = 1;
 		
 		const float A = 0.0f;
@@ -101,12 +102,10 @@ VS_OUTPUT_SOFT vs_soft( float4 pos : POSITION0, float4 color : COLOR0)
 		float Ss = Vh * Si * sqrt( 1/( A + B*dist + C*distSq ) );
 		Out.PSize = Ss;
     }
-    
-    //Out.PSize = 100.0f;
-    
-    float2 uv = (0.5f * (Out.Position.xy / Out.Position.w)) + 0.5f;
-    
-    Out.ScreenPos = float4(uv,Out.PSize,0);
+
+    float3 normalisedPosition = (0.5f * (float3(Out.Position.x,-Out.Position.y,Out.Position.z) / Out.Position.w)) + 0.5f;
+
+    Out.ScreenPos = float4(normalisedPosition, Out.PSize / max(ViewportDimensions.x, ViewportDimensions.y));
 
     return Out;
 }
@@ -122,8 +121,11 @@ struct PS_INPUT_SOFT
 
 float4 ps_soft( in PS_INPUT_SOFT In ) : COLOR0
 {
-	float2 uv = In.ScreenPos.xy + (((2.0f*In.TexCoord)-1.0f));
-	//uv *= 5;
+	float vpMul = max(ViewportDimensions.x, ViewportDimensions.y);
+	float2 psize = float2(	In.ScreenPos.w * vpMul / (2 * ViewportDimensions.x),
+							In.ScreenPos.w * vpMul / (2 * ViewportDimensions.y) );
+
+	float2 uv = In.ScreenPos.xy + (((2.0f*In.TexCoord)-1.0f)) * psize;
     //return float4(uv, 0, 1);
     //return float4(In.TexCoord, 0, 1);
 
@@ -131,10 +133,12 @@ float4 ps_soft( in PS_INPUT_SOFT In ) : COLOR0
     return float4(gvalue.xy, 0, 1);
 
     float scenedepth = F32_Decompress(gvalue.zw);
-    float particledepth = In.ScreenPos.z / In.ScreenPos.w;
+    float particledepth = In.ScreenPos.z*2 - 1;
     float scale = 1.0f;
     
     float f = saturate((scenedepth - particledepth) * scale);
+    
+    //return float4( particledepth, particledepth, particledepth, 1 );
     
     float4 color = float4(f,f,f,1);
     
@@ -172,7 +176,7 @@ Technique SoftParticle
 	{
 		PointSpriteEnable = true;
 
-		AlphaBlendEnable	= TRUE;  
+		AlphaBlendEnable	= FALSE;  
 		SrcBlend			= SrcAlpha;
 		DestBlend			= InvSrcAlpha;
 
