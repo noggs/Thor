@@ -6,6 +6,8 @@
 #include <math/Vector.h>
 #include <core/Core.h>
 
+#include <sqlite3.h>
+
 using namespace Thor;
 
 

@@ -42,7 +42,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="../../thor; C:\Program Files\Microsoft DirectX SDK (February 2010)\Include"
+				AdditionalIncludeDirectories="../../thor;&quot;C:\Program Files\Microsoft DirectX SDK (February 2010)\Include&quot;;../../foreign/sqlite"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -119,7 +119,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="../../thor; C:\Program Files\Microsoft DirectX SDK (February 2010)\Include"
+				AdditionalIncludeDirectories="../../thor;&quot;C:\Program Files\Microsoft DirectX SDK (February 2010)\Include&quot;;../../foreign/sqlite"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -178,7 +178,15 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\src\DbInterface.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\main.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\foreign\sqlite\sqlite3.c"
 				>
 			</File>
 		</Filter>
@@ -187,6 +195,14 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath=".\src\DbInterface.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\foreign\sqlite\sqlite3.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"

@@ -13,6 +13,8 @@
 #include <core/Profiler.h>
 #include <fx/SimpleFX.h>
 
+#include "DbInterface.h"
+
 static const float PI = 3.1415f;
 
 // include the Direct3D Library file
@@ -73,6 +75,8 @@ void UpdateFPS()
 int gMainRes[] = {800, 600};
 int gRTRes[] = {512,512};
 
+Thor::DbInterface* db;
+
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance,
@@ -107,6 +111,12 @@ int WINAPI WinMain(HINSTANCE hInstance,
                           NULL);
 
     ShowWindow(hWnd, nCmdShow);
+
+	// create DB
+	db = new Thor::DbInterface(":memory:");		// in-memory only
+	//db = new Thor::DbInterface("");			// Temp disk file
+
+	db->CreateAndPopulate();
 
     // set up and initialize Direct3D
     initD3D(hWnd);
@@ -546,6 +556,11 @@ void render_frame(void)
 {
 	Thor::Profiler::Instance()->BeginFrame();
 
+	{
+		Thor::ProfileScope prof("GetMatricesFromDB");
+		db->GetLocalMatrices( &gLocalMatrices[0], 10 );
+	}
+
 
 	if(duckTexture==NULL)
 	{
@@ -633,6 +648,12 @@ void render_frame(void)
 			D3DXMatrixInverse( &matInvProj, NULL, &matProj );
 		}
 	}
+
+	{
+		Thor::ProfileScope prof("UpdateWorldMatricesToDB");
+		db->SetWorldMatrices( &gWorldMatrices[0], 10 );
+	}
+
 
 	UINT cPasses, iPass;
 	float gbufferSize[] = {(float)gRTRes[0], (float)gRTRes[1] };
