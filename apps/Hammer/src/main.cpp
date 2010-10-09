@@ -114,7 +114,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
 	// create DB
 	db = new Thor::DbInterface(":memory:");		// in-memory only
-	//db = new Thor::DbInterface("");			// Temp disk file
+	//db = new Thor::DbInterface("temp.db");			// Temp disk file
 
 	db->CreateAndPopulate();
 
@@ -153,6 +153,8 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     // clean up DirectX and COM
     cleanD3D();
+
+	delete db;
 
     return msg.wParam;
 }

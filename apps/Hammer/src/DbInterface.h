@@ -39,6 +39,8 @@ namespace Thor
 		sqlite3* mDB;
 
 		// cache queries and insert statements
+		sqlite3_stmt*	mStmt_BeginTransaction;
+		sqlite3_stmt*	mStmt_CommitTransaction;
 		sqlite3_stmt*	mStmt_AddMatrix;
 		sqlite3_stmt*	mStmt_AddModel;
 		sqlite3_stmt*	mStmt_SelectLocalMatrices;

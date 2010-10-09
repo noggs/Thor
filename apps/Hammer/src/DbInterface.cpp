@@ -17,6 +17,8 @@ namespace Thor
 
 	DbInterface::DbInterface(const char *dbName)
 		: mDB(NULL)
+		, mStmt_BeginTransaction(NULL)
+		, mStmt_CommitTransaction(NULL)
 		, mStmt_AddMatrix(NULL)
 		, mStmt_AddModel(NULL)
 		, mStmt_SelectLocalMatrices(NULL)
@@ -35,6 +37,8 @@ namespace Thor
 
 	DbInterface::~DbInterface()
 	{
+		sqlite3_finalize( mStmt_BeginTransaction );
+		sqlite3_finalize( mStmt_CommitTransaction );
 		sqlite3_finalize( mStmt_AddMatrix );
 		sqlite3_finalize( mStmt_AddModel );
 		sqlite3_finalize( mStmt_SelectLocalMatrices );
@@ -46,6 +50,13 @@ namespace Thor
 	void DbInterface::CreateStatements()
 	{
 		int ret;
+
+		{
+			const char* sql[] = { "BEGIN TRANSACTION;", "COMMIT TRANSACTION;" };
+			ret = sqlite3_prepare_v2(mDB, sql[0], -1, &mStmt_BeginTransaction, NULL);
+			ret = sqlite3_prepare_v2(mDB, sql[1], -1, &mStmt_CommitTransaction, NULL);
+		}
+
 		{
 			///
 			// Begin transaction
@@ -78,7 +89,7 @@ namespace Thor
 				"WHERE ROWID = ?"
 				;
 
-			ret = sqlite3_prepare(mDB, sql, -1, &mStmt_UpdateWorldMatrices, NULL);
+			ret = sqlite3_prepare_v2(mDB, sql, -1, &mStmt_UpdateWorldMatrices, NULL);
 		}
 
 	}
@@ -168,11 +179,13 @@ namespace Thor
 		//matIdentity.px = 13.0f;	matIdentity.py = 14.0f;	matIdentity.pz = 15.0f;	matIdentity.pw = 16.0f;
 
 		Thor::MtxIdentity( matIdentity );
-		AddModel( "tiny_bones", matIdentity );
 
-		matIdentity.px = 2.0f;
+		//matIdentity.px = 2.0f;
 		//for(int i=0; i<800; ++i)
 		AddModel( "duck", matIdentity );
+		AddModel( "plane", matIdentity );
+		AddModel( "tiny_bones", matIdentity );
+
 
 	}
 
@@ -193,8 +206,11 @@ namespace Thor
 		// add 2 matrices
 		ret = sqlite3_step( mStmt_AddMatrix );
 		thorAssertNoMessage( ret == SQLITE_DONE );
+		ret = sqlite3_reset( mStmt_AddMatrix );
+
 		ret = sqlite3_step( mStmt_AddMatrix );
 		thorAssertNoMessage( ret == SQLITE_DONE );
+		ret = sqlite3_reset( mStmt_AddMatrix );
 
 		// get the matrix rowID of the last inserted matrix
 		sqlite3_int64 rowID = sqlite3_last_insert_rowid(mDB);
@@ -207,6 +223,7 @@ namespace Thor
 		// add the model
 		ret = sqlite3_step( mStmt_AddModel );
 		thorAssertNoMessage( ret == SQLITE_DONE );
+		ret = sqlite3_reset( mStmt_AddModel );
 
 		sqlite3_int64 modelID = sqlite3_last_insert_rowid(mDB);
 
@@ -254,6 +271,9 @@ namespace Thor
 		int matCount = 0;
 		sqlite3_stmt* stmt = mStmt_UpdateWorldMatrices;
 
+		// BEGIN TRANSACTION
+		ret = sqlite3_step( mStmt_BeginTransaction );
+
 		for( int i=0; i<numMats; ++i )
 		{
 			// naughty!!?
@@ -276,6 +296,9 @@ namespace Thor
 
 			ret = sqlite3_reset( stmt );
 		}
+
+		// END TRANSACTION
+		ret = sqlite3_step( mStmt_CommitTransaction );
 
 
 		return matCount;
